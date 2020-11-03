@@ -89,6 +89,15 @@ is inspired by the conservative garbage collector of Hans Boehm.
 
 void print_my_name();
 
+// -------------------------- ASSIGNMENT 1 -------------------------
+
+uint64_t is_character_hexadecimal();
+uint64_t value_of_hexadecimal(uint64_t c);
+uint64_t MAX_HEX_INTEGER_LENGTH = 16;
+uint64_t is_assembly_command();
+void selfie_compile_as_assembly();
+void assembly_compile();
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -236,6 +245,7 @@ uint64_t CHAR_EXCLAMATION  = '!';
 uint64_t CHAR_LT           = '<';
 uint64_t CHAR_GT           = '>';
 uint64_t CHAR_BACKSLASH    =  92; // ASCII code 92 = backslash
+uint64_t CHAR_DOT          = '.';
 
 uint64_t* character_buffer; // buffer for reading and writing characters
 
@@ -407,6 +417,26 @@ uint64_t SYM_INT      = 28; // int
 uint64_t SYM_CHAR     = 29; // char
 uint64_t SYM_UNSIGNED = 30; // unsigned
 
+uint64_t SYM_DOT = 31;
+
+// symbols for assembly assignment-1
+
+uint64_t SYM_LUI      = 32; // lui
+uint64_t SYM_ADDI     = 33; // addi
+uint64_t SYM_LD       = 34; // ld
+uint64_t SYM_SD       = 35; // sd
+uint64_t SYM_ADD      = 36; // add
+uint64_t SYM_SUB      = 37; // sub
+uint64_t SYM_MUL      = 38; // mul
+uint64_t SYM_DIVU     = 39; // divu
+uint64_t SYM_REMU     = 40; // remu
+uint64_t SYM_SLTU     = 41; // sltu
+uint64_t SYM_BEQ      = 42; // beq
+uint64_t SYM_JAL      = 43; // jal
+uint64_t SYM_JALR     = 44; // jalr
+uint64_t SYM_ECALL    = 45; // ecall
+uint64_t SYM_QUAD     = 46; // quad
+
 uint64_t* SYMBOLS; // strings representing symbols
 
 uint64_t MAX_IDENTIFIER_LENGTH = 64;  // maximum number of characters in an identifier
@@ -441,7 +471,7 @@ uint64_t source_fd   = 0; // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void init_scanner () {
-  SYMBOLS = smalloc((SYM_UNSIGNED + 1) * SIZEOFUINT64STAR);
+  SYMBOLS = smalloc((SYM_QUAD + 1) * SIZEOFUINT64STAR);
 
   *(SYMBOLS + SYM_INTEGER)      = (uint64_t) "integer";
   *(SYMBOLS + SYM_CHARACTER)    = (uint64_t) "character";
@@ -475,6 +505,22 @@ void init_scanner () {
   *(SYMBOLS + SYM_INT)      = (uint64_t) "int";
   *(SYMBOLS + SYM_CHAR)     = (uint64_t) "char";
   *(SYMBOLS + SYM_UNSIGNED) = (uint64_t) "unsigned";
+
+  *(SYMBOLS + SYM_LUI)   = (uint64_t) "lui";
+  *(SYMBOLS + SYM_ADDI)  = (uint64_t) "addi";
+  *(SYMBOLS + SYM_LD)    = (uint64_t) "ld";
+  *(SYMBOLS + SYM_SD)    = (uint64_t) "sd";
+  *(SYMBOLS + SYM_ADD)   = (uint64_t) "add";
+  *(SYMBOLS + SYM_SUB)   = (uint64_t) "sub";
+  *(SYMBOLS + SYM_MUL)   = (uint64_t) "mul";
+  *(SYMBOLS + SYM_DIVU)  = (uint64_t) "divu";
+  *(SYMBOLS + SYM_REMU)  = (uint64_t) "remu";
+  *(SYMBOLS + SYM_SLTU)  = (uint64_t) "sltu";
+  *(SYMBOLS + SYM_BEQ)   = (uint64_t) "beq";
+  *(SYMBOLS + SYM_JAL)   = (uint64_t) "jal";
+  *(SYMBOLS + SYM_JALR)  = (uint64_t) "jalr";
+  *(SYMBOLS + SYM_ECALL) = (uint64_t) "ecall";
+  *(SYMBOLS + SYM_QUAD)  = (uint64_t) "quad";
 
   character = CHAR_EOF;
   symbol    = SYM_EOF;
@@ -2232,6 +2278,26 @@ uint64_t string_compare(char* s, char* t) {
       return 0;
 }
 
+uint64_t value_of_hexadecimal(uint64_t c) {
+  // ASCII codes for lower- and uppercase letters are in contiguous intervals
+  if (c >= 'a')
+    if (c <= 'f')
+      return c - 67; // 10 - 'a' = 67
+
+  if (c >= 'A')
+    if (c <= 'F')
+      return c - 55; // 10 - 'A' = 55
+
+  // ASCII codes for digits are in a contiguous interval
+  if (c >= '0')
+    if (c <= '9')
+      return c - '0';
+
+  printf2("%s: cannot convert non-hexadecimal number %d\n", selfie_name, (char*) c);
+  exit(EXITCODE_BADARGUMENTS);
+  return c;
+}
+
 uint64_t atoi(char* s) {
   uint64_t i;
   uint64_t n;
@@ -2247,6 +2313,37 @@ uint64_t atoi(char* s) {
   // load character (one byte) at index i in s from memory requires
   // bit shifting since memory access can only be done in double words
   c = load_character(s, i);
+
+  // assignment-1
+  // s starts with x if s is a hexadecimal
+  if (c == 'x') {
+    // go to the next digit
+    i = i + 1;
+    c = load_character(s, i);
+
+    while (c != 0) {
+      if (i - 1 >= MAX_HEX_INTEGER_LENGTH) { // i - 1 because i starts with 1
+        // 1 character in hexadecimal needs 4 bits. 4*16=64 /  16 times F  \
+        // s contains a hexadecimal number  larger  than  0xFFFFFFFFFFFFFFFF
+        printf2("%s: cannot convert out-of-bound hexadecimal number 0%s\n", selfie_name, s);
+
+        exit(EXITCODE_BADARGUMENTS);
+      }
+
+      c = value_of_hexadecimal(c);
+      n = n * 16 + c;
+
+      // go to the next digit
+      i = i + 1;
+
+      // load character (one byte) at index i in s from memory requires
+      // bit shifting since memory access can only be done in double words
+      c = load_character(s, i);
+
+    }
+
+    return n;
+  }
 
   // loop until s is terminated
   while (c != 0) {
@@ -3014,6 +3111,22 @@ uint64_t is_character_digit() {
     return 0;
 }
 
+uint64_t is_character_hexadecimal() {
+  // ASCII codes for lower- and uppercase letters and digits are in contiguous intervals
+  if (character >= 'a')
+    if (character <= 'f')
+      return 1;
+    else
+      return 0;
+  else if (character >= 'A')
+    if (character <= 'F')
+      return 1;
+    else
+      return 0;
+  else
+    return is_character_digit();
+}
+
 uint64_t is_character_letter_or_digit_or_underscore() {
   if (is_character_letter())
     return 1;
@@ -3062,6 +3175,36 @@ uint64_t identifier_or_keyword() {
   else if (identifier_string_match(SYM_UNSIGNED))
     // selfie bootstraps unsigned to uint64_t!
     return SYM_UINT64;
+  else if (identifier_string_match(SYM_LUI))
+    return SYM_LUI;
+  else if (identifier_string_match(SYM_ADDI))
+    return SYM_ADDI;
+  else if (identifier_string_match(SYM_LD))
+    return SYM_LD;
+  else if (identifier_string_match(SYM_SD))
+    return SYM_SD;
+  else if (identifier_string_match(SYM_ADD))
+    return SYM_ADD;
+  else if (identifier_string_match(SYM_SUB))
+    return SYM_SUB;
+  else if (identifier_string_match(SYM_MUL))
+    return SYM_MUL;
+  else if (identifier_string_match(SYM_DIVU))
+    return SYM_DIVU;
+  else if (identifier_string_match(SYM_REMU))
+    return SYM_REMU;
+  else if (identifier_string_match(SYM_SLTU))
+    return SYM_SLTU;
+  else if (identifier_string_match(SYM_BEQ))
+    return SYM_BEQ;
+  else if (identifier_string_match(SYM_JAL))
+    return SYM_JAL;
+  else if (identifier_string_match(SYM_JALR))
+    return SYM_JALR;
+  else if (identifier_string_match(SYM_ECALL))
+    return SYM_ECALL;
+  else if (identifier_string_match(SYM_QUAD))
+    return SYM_QUAD;
   else
     return SYM_IDENTIFIER;
 }
@@ -3121,6 +3264,34 @@ void get_symbol() {
           i = i + 1;
 
           get_character();
+        }
+
+        // assignment-1
+        // hexadecimal numbers prefixed with 0x
+        // if the symbol is a hexadecimal
+        if (i == 1) {
+          if (character == 'x') {
+            if (load_character(integer, 0) == '0') {
+              store_character(integer, 0, character);
+              get_character();
+
+              while (is_character_hexadecimal()) {
+                if (i - 1 >= MAX_HEX_INTEGER_LENGTH) { // i - 1 because i starts with 1
+                  if (integer_is_signed)
+                    syntax_error_message("signed integer out of bound");
+                  else
+                    syntax_error_message("integer out of bound");
+                  exit(EXITCODE_SCANNERERROR);
+                }
+
+                store_character(integer, i, character);
+
+                i = i + 1;
+
+                get_character();
+              }
+            }
+          }
         }
 
         store_character(integer, i, 0); // null-terminated string
@@ -3289,6 +3460,11 @@ void get_symbol() {
           symbol = SYM_GEQ;
         } else
           symbol = SYM_GT;
+
+      } else if (character == CHAR_DOT) {
+        get_character();
+
+        symbol = SYM_DOT;
 
       } else {
         print_line_number("syntax error", line_number);
@@ -3543,6 +3719,43 @@ uint64_t is_comparison() {
   else if (symbol == SYM_LEQ)
     return 1;
   else if (symbol == SYM_GEQ)
+    return 1;
+  else
+    return 0;
+}
+
+uint64_t is_assembly_command() {
+  if (symbol == SYM_LUI)
+    return 1;
+  else if (symbol == SYM_ADDI)
+    return 1;
+  else if (symbol == SYM_LD)
+    return 1;
+  else if (symbol == SYM_SD)
+    return 1;
+  else if (symbol == SYM_ADD)
+    return 1;
+  else if (symbol == SYM_SUB)
+    return 1;
+  else if (symbol == SYM_MUL)
+    return 1;
+  else if (symbol == SYM_DIVU)
+    return 1;
+  else if (symbol == SYM_REMU)
+    return 1;
+  else if (symbol == SYM_SLTU)
+    return 1;
+  else if (symbol == SYM_BEQ)
+    return 1;
+  else if (symbol == SYM_JAL)
+    return 1;
+  else if (symbol == SYM_JALR)
+    return 1;
+  else if (symbol == SYM_ECALL)
+    return 1;
+  else if (symbol == SYM_QUAD)
+    return 1;
+  else if (symbol == SYM_DOT)
     return 1;
   else
     return 0;
@@ -4985,6 +5198,191 @@ void compile_procedure(char* procedure, uint64_t type) {
   // assert: allocated_temporaries == 0
 }
 
+void assembly_compile() {
+  while (symbol != SYM_EOF) {
+    if (symbol == SYM_LUI) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // imm
+    } else if (symbol == SYM_ADDI) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+    } else if (symbol == SYM_LD) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+      get_symbol(); // (
+      get_symbol(); // rs1
+      get_symbol(); // )
+    } else if (symbol == SYM_SD) {
+      get_symbol();
+      get_symbol(); // rs2
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+      get_symbol(); // (
+      get_symbol(); // rs1
+      get_symbol(); // )
+    } else if (symbol == SYM_ADD) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+    } else if (symbol == SYM_SUB) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // rs2
+    } else if (symbol == SYM_MUL) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+    } else if (symbol == SYM_DIVU) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+    } else if (symbol == SYM_REMU) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+    } else if (symbol == SYM_SLTU) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+    } else if (symbol == SYM_BEQ) {
+      get_symbol();
+      get_symbol(); // rs1
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      get_symbol(); // rs2
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+    } else if (symbol == SYM_JAL) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+    } else if (symbol == SYM_JALR) {
+      get_symbol();
+      get_symbol(); // rd
+      if (symbol == SYM_COMMA)
+        get_symbol(); // ,
+      else
+        syntax_error_symbol(SYM_COMMA);
+      if (symbol == SYM_MINUS)
+        get_symbol(); // -
+      get_symbol(); // imm
+      get_symbol(); // (
+      get_symbol(); // rs1
+      get_symbol(); // )
+    } else if (symbol == SYM_ECALL) {
+      get_symbol();
+    } else if (symbol == SYM_DOT) {
+      get_symbol();
+      if (symbol == SYM_QUAD) {
+        get_symbol();
+        return;
+      } else
+        syntax_error_symbol(SYM_QUAD);
+    } else {
+      syntax_error_unexpected();
+      get_symbol();
+    }
+  }
+}
+
 void compile_cstar() {
   uint64_t type;
   char* variable_or_procedure_name;
@@ -5312,6 +5710,140 @@ void selfie_compile() {
       reset_parser();
 
       compile_cstar();
+
+      printf4("%s: %u characters read in %u lines and %u comments\n", selfie_name,
+        (char*) number_of_read_characters,
+        (char*) line_number,
+        (char*) number_of_comments);
+
+      printf4("%s: with %u(%.2u%%) characters in %u actual symbols\n", selfie_name,
+        (char*) (number_of_read_characters - number_of_ignored_characters),
+        (char*) fixed_point_percentage(fixed_point_ratio(number_of_read_characters, number_of_read_characters - number_of_ignored_characters, 4), 4),
+        (char*) number_of_scanned_symbols);
+
+      printf4("%s: %u global variables, %u procedures, %u string literals\n", selfie_name,
+        (char*) number_of_global_variables,
+        (char*) number_of_procedures,
+        (char*) number_of_strings);
+
+      printf6("%s: %u calls, %u assignments, %u while, %u if, %u return\n", selfie_name,
+        (char*) number_of_calls,
+        (char*) number_of_assignments,
+        (char*) number_of_while,
+        (char*) number_of_if,
+        (char*) number_of_return);
+    }
+  }
+
+  if (number_of_source_files == 0)
+    printf1("%s: nothing to compile, only library generated\n", selfie_name);
+
+  emit_bootstrapping();
+
+  if (GC_ON)
+    emit_fetch_data_segment_size_implementation(fetch_dss_code_location);
+
+  emit_data_segment();
+
+  ELF_header = create_elf_header(binary_length, code_length);
+
+  entry_point = ELF_ENTRY_POINT;
+
+  printf3("%s: symbol table search time was %u iterations on average and %u in total\n", selfie_name,
+    (char*) (total_search_time / number_of_searches),
+    (char*) total_search_time);
+
+  printf4("%s: %u bytes generated with %u instructions and %u bytes of data\n", selfie_name,
+    (char*) binary_length,
+    (char*) (code_length / INSTRUCTIONSIZE),
+    (char*) (binary_length - code_length));
+
+  print_instruction_counters();
+}
+
+void selfie_compile_as_assembly() {
+  uint64_t link;
+  uint64_t number_of_source_files;
+  uint64_t fetch_dss_code_location;
+
+  fetch_dss_code_location = 0;
+
+  // link until next console option
+  link = 1;
+
+  number_of_source_files = 0;
+
+  source_name = "library";
+
+  binary_name = source_name;
+
+  // allocate memory for storing binary
+  binary        = zmalloc(MAX_BINARY_LENGTH);
+  binary_length = 0;
+
+  // reset code length
+  code_length = 0;
+
+  // allocate zeroed memory for storing source code line numbers
+  code_line_number = zmalloc(MAX_CODE_LENGTH / INSTRUCTIONSIZE * SIZEOFUINT64);
+  data_line_number = zmalloc(MAX_DATA_LENGTH / WORDSIZE * SIZEOFUINT64);
+
+  reset_symbol_tables();
+  reset_instruction_counters();
+
+  emit_program_entry();
+
+  // emit system call wrappers
+  // exit code must be first
+  emit_exit();
+  emit_read();
+  emit_write();
+  emit_open();
+
+  emit_malloc();
+
+  emit_switch();
+
+  if (GC_ON) {
+    emit_fetch_stack_pointer();
+    emit_fetch_global_pointer();
+
+    // save code location of eventual fetch_data_segment_size implementation
+    fetch_dss_code_location = binary_length;
+
+    emit_fetch_data_segment_size_interface();
+  }
+
+  // implicitly declare main procedure in global symbol table
+  // copy "main" string into zeroed double word to obtain unique hash
+  create_symbol_table_entry(GLOBAL_TABLE, string_copy("main"), 0, PROCEDURE, UINT64_T, 0, 0);
+
+  while (link) {
+    if (number_of_remaining_arguments() == 0)
+      link = 0;
+    else if (load_character(peek_argument(0), 0) == '-')
+      link = 0;
+    else {
+      source_name = get_argument();
+
+      number_of_source_files = number_of_source_files + 1;
+
+      printf2("%s: selfie compiling %s with starc\n", selfie_name, source_name);
+
+      // assert: source_name is mapped and not longer than MAX_FILENAME_LENGTH
+
+      source_fd = sign_extend(open(source_name, O_RDONLY, 0), SYSCALL_BITWIDTH);
+
+      if (signed_less_than(source_fd, 0)) {
+        printf2("%s: could not open input file %s\n", selfie_name, source_name);
+
+        exit(EXITCODE_IOERROR);
+      }
+
+      reset_scanner();
+      reset_parser();
+
+      assembly_compile();
 
       printf4("%s: %u characters read in %u lines and %u comments\n", selfie_name,
         (char*) number_of_read_characters,
@@ -10204,7 +10736,7 @@ uint64_t no_or_bad_or_more_arguments(uint64_t exit_code) {
 }
 
 void print_synopsis(char* extras) {
-  printf2("synopsis: %s { -c { source } | -o binary | [ -s | -S ] assembly | -l binary }%s\n", selfie_name, extras);
+  printf2("synopsis: %s { -c { source } | -a { source } | -o binary | [ -s | -S ] assembly | -l binary }%s\n", selfie_name, extras);
 }
 
 // -----------------------------------------------------------------
@@ -10226,6 +10758,8 @@ uint64_t selfie(uint64_t extras) {
 
       if (string_compare(argument, "-c"))
         selfie_compile();
+      else if (string_compare(argument, "-a"))
+        selfie_compile_as_assembly();
       else if (number_of_remaining_arguments() == 0)
         // remaining options have at least one argument
         return EXITCODE_BADARGUMENTS;
