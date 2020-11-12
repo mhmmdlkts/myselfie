@@ -98,6 +98,10 @@ uint64_t is_assembly_command();
 void selfie_compile_as_assembly();
 void assembly_compile();
 
+// -------------------------- ASSIGNMENT 2 -------------------------
+
+uint64_t get_register();
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -436,6 +440,7 @@ uint64_t SYM_JAL      = 43; // jal
 uint64_t SYM_JALR     = 44; // jalr
 uint64_t SYM_ECALL    = 45; // ecall
 uint64_t SYM_QUAD     = 46; // quad
+uint64_t SYM_NOP      = 47; // nop
 
 uint64_t* SYMBOLS; // strings representing symbols
 
@@ -471,7 +476,7 @@ uint64_t source_fd   = 0; // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void init_scanner () {
-  SYMBOLS = smalloc((SYM_QUAD + 1) * SIZEOFUINT64STAR);
+  SYMBOLS = smalloc((SYM_NOP + 1) * SIZEOFUINT64STAR);
 
   *(SYMBOLS + SYM_INTEGER)      = (uint64_t) "integer";
   *(SYMBOLS + SYM_CHARACTER)    = (uint64_t) "character";
@@ -521,6 +526,7 @@ void init_scanner () {
   *(SYMBOLS + SYM_JALR)  = (uint64_t) "jalr";
   *(SYMBOLS + SYM_ECALL) = (uint64_t) "ecall";
   *(SYMBOLS + SYM_QUAD)  = (uint64_t) "quad";
+  *(SYMBOLS + SYM_NOP)   = (uint64_t) "nop";
 
   character = CHAR_EOF;
   symbol    = SYM_EOF;
@@ -3205,6 +3211,8 @@ uint64_t identifier_or_keyword() {
     return SYM_ECALL;
   else if (identifier_string_match(SYM_QUAD))
     return SYM_QUAD;
+  else if (identifier_string_match(SYM_NOP))
+    return SYM_NOP;
   else
     return SYM_IDENTIFIER;
 }
@@ -5198,182 +5206,325 @@ void compile_procedure(char* procedure, uint64_t type) {
   // assert: allocated_temporaries == 0
 }
 
+uint64_t get_register() {
+  if (string_compare(identifier, "zero"))
+    return REG_ZR;
+  else if (string_compare(identifier, "ra"))
+    return REG_RA;
+  else if (string_compare(identifier, "sp"))
+    return REG_SP;
+  else if (string_compare(identifier, "gp"))
+    return REG_GP;
+  else if (string_compare(identifier, "tp"))
+    return REG_TP;
+  else if (string_compare(identifier, "t0"))
+    return REG_T0;
+  else if (string_compare(identifier, "t1"))
+    return REG_T1;
+  else if (string_compare(identifier, "t2"))
+    return REG_T2;
+  else if (string_compare(identifier, "s0"))
+    return REG_S0;
+  else if (string_compare(identifier, "s1"))
+    return REG_S1;
+  else if (string_compare(identifier, "a0"))
+    return REG_A0;
+  else if (string_compare(identifier, "a1"))
+    return REG_A1;
+  else if (string_compare(identifier, "a2"))
+    return REG_A2;
+  else if (string_compare(identifier, "a3"))
+    return REG_A3;
+  else if (string_compare(identifier, "a4"))
+    return REG_A4;
+  else if (string_compare(identifier, "a5"))
+    return REG_A5;
+  else if (string_compare(identifier, "a6"))
+    return REG_A6;
+  else if (string_compare(identifier, "a7"))
+    return REG_A7;
+  else if (string_compare(identifier, "s2"))
+    return REG_S2;
+  else if (string_compare(identifier, "s3"))
+    return REG_S3;
+  else if (string_compare(identifier, "s4"))
+    return REG_S4;
+  else if (string_compare(identifier, "s5"))
+    return REG_S5;
+  else if (string_compare(identifier, "s6"))
+    return REG_S6;
+  else if (string_compare(identifier, "s7"))
+    return REG_S7;
+  else if (string_compare(identifier, "s8"))
+    return REG_S8;
+  else if (string_compare(identifier, "s9"))
+    return REG_S9;
+  else if (string_compare(identifier, "s10"))
+    return REG_S10;
+  else if (string_compare(identifier, "s11"))
+    return REG_S11;
+  else if (string_compare(identifier, "t3"))
+    return REG_T3;
+  else if (string_compare(identifier, "t4"))
+    return REG_T4;
+  else if (string_compare(identifier, "t5"))
+    return REG_T5;
+  else if (string_compare(identifier, "t6"))
+    return REG_T6;
+  exit(EXITCODE_PARSERERROR);
+  return -1;
+}
+
 void assembly_compile() {
+  uint64_t a;
+  uint64_t b;
+  uint64_t c;
+  uint64_t mult;
+  mult = 1;
+
   while (symbol != SYM_EOF) {
     if (symbol == SYM_LUI) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = sign_extend(literal, 20);
       get_symbol(); // imm
+      emit_lui(a, c);
     } else if (symbol == SYM_ADDI) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
+      emit_addi(a,b,c);
       get_symbol(); // imm
     } else if (symbol == SYM_LD) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
       get_symbol(); // imm
       get_symbol(); // (
+      b = get_register();
       get_symbol(); // rs1
       get_symbol(); // )
+      emit_ld(a,b,c);
     } else if (symbol == SYM_SD) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rs2
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
       get_symbol(); // imm
       get_symbol(); // (
+      b = get_register();
       get_symbol(); // rs1
       get_symbol(); // )
+      emit_sd(a,c,b);
     } else if (symbol == SYM_ADD) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = get_register();
       get_symbol(); // rs2
+      emit_add(a,b,c);
     } else if (symbol == SYM_SUB) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = get_register();
       get_symbol(); // rs2
+      emit_sub(a,b,c);
     } else if (symbol == SYM_MUL) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = get_register();
       get_symbol(); // rs2
+      emit_mul(a,b,c);
     } else if (symbol == SYM_DIVU) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = get_register();
       get_symbol(); // rs2
+      emit_divu(a,b,c);
     } else if (symbol == SYM_REMU) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = get_register();
       get_symbol(); // rs2
+      emit_remu(a,b,c);
     } else if (symbol == SYM_SLTU) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      c = get_register();
       get_symbol(); // rs2
+      emit_sltu(a,b,c);
     } else if (symbol == SYM_BEQ) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rs1
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
+      b = get_register();
       get_symbol(); // rs2
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
       get_symbol(); // imm
+      emit_beq(a,b,c * INSTRUCTIONSIZE);
     } else if (symbol == SYM_JAL) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
       get_symbol(); // imm
+      emit_jal(a,c * INSTRUCTIONSIZE);
     } else if (symbol == SYM_JALR) {
       get_symbol();
+      a = get_register();
       get_symbol(); // rd
       if (symbol == SYM_COMMA)
         get_symbol(); // ,
       else
         syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS)
+      if (symbol == SYM_MINUS) {
+        mult = -1;
         get_symbol(); // -
+      }
+      c = mult * literal;
       get_symbol(); // imm
       get_symbol(); // (
+      b = get_register();
       get_symbol(); // rs1
       get_symbol(); // )
+      emit_jalr(a,b,c * INSTRUCTIONSIZE);
     } else if (symbol == SYM_ECALL) {
       get_symbol();
+      emit_ecall();
+    }  else if (symbol == SYM_NOP) {
+      get_symbol();
+      emit_nop();
     } else if (symbol == SYM_DOT) {
       get_symbol();
       if (symbol == SYM_QUAD) {
         get_symbol();
-        return;
+        get_symbol();
       } else
         syntax_error_symbol(SYM_QUAD);
     } else {
@@ -5844,28 +5995,6 @@ void selfie_compile_as_assembly() {
       reset_parser();
 
       assembly_compile();
-
-      printf4("%s: %u characters read in %u lines and %u comments\n", selfie_name,
-        (char*) number_of_read_characters,
-        (char*) line_number,
-        (char*) number_of_comments);
-
-      printf4("%s: with %u(%.2u%%) characters in %u actual symbols\n", selfie_name,
-        (char*) (number_of_read_characters - number_of_ignored_characters),
-        (char*) fixed_point_percentage(fixed_point_ratio(number_of_read_characters, number_of_read_characters - number_of_ignored_characters, 4), 4),
-        (char*) number_of_scanned_symbols);
-
-      printf4("%s: %u global variables, %u procedures, %u string literals\n", selfie_name,
-        (char*) number_of_global_variables,
-        (char*) number_of_procedures,
-        (char*) number_of_strings);
-
-      printf6("%s: %u calls, %u assignments, %u while, %u if, %u return\n", selfie_name,
-        (char*) number_of_calls,
-        (char*) number_of_assignments,
-        (char*) number_of_while,
-        (char*) number_of_if,
-        (char*) number_of_return);
     }
   }
 
@@ -5882,15 +6011,6 @@ void selfie_compile_as_assembly() {
   ELF_header = create_elf_header(binary_length, code_length);
 
   entry_point = ELF_ENTRY_POINT;
-
-  printf3("%s: symbol table search time was %u iterations on average and %u in total\n", selfie_name,
-    (char*) (total_search_time / number_of_searches),
-    (char*) total_search_time);
-
-  printf4("%s: %u bytes generated with %u instructions and %u bytes of data\n", selfie_name,
-    (char*) binary_length,
-    (char*) (code_length / INSTRUCTIONSIZE),
-    (char*) (binary_length - code_length));
 
   print_instruction_counters();
 }
