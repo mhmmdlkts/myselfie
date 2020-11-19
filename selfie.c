@@ -102,6 +102,12 @@ void assembly_compile();
 
 uint64_t get_register();
 
+// -------------------------- ASSIGNMENT 3 -------------------------
+
+uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count);
+uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count);
+uint64_t CONCURRENT_TIMESLICE = 1;
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -1923,7 +1929,7 @@ char* replace_extension(char* filename, char* extension);
 
 void boot_loader(uint64_t* context);
 
-uint64_t selfie_run(uint64_t machine);
+uint64_t selfie_run(uint64_t machine, uint64_t context_numbers);
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
@@ -10519,6 +10525,39 @@ uint64_t mipster(uint64_t* to_context) {
   }
 }
 
+uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count) {
+  uint64_t timeout;
+  uint64_t* from_context;
+
+  print("mipster\n");
+  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
+
+  timeout = CONCURRENT_TIMESLICE;
+
+  while (1) {
+    from_context = mipster_switch(to_context, timeout);
+
+    if (get_parent(from_context) != MY_CONTEXT) {
+      to_context = get_parent(from_context);
+
+      timeout = TIMEROFF;
+    } else if (handle_exception(from_context) == EXIT) {
+        context_count = context_count - 1;
+        to_context = delete_context(from_context, used_contexts);
+        timeout = CONCURRENT_TIMESLICE;
+        if (context_count < 1)
+          return get_exit_code(from_context);
+    } else {
+      if (get_next_context(to_context) != (uint64_t*) 0)
+        to_context = get_next_context(to_context);
+      else
+        to_context = used_contexts;
+
+      timeout = CONCURRENT_TIMESLICE;
+    }
+  }
+}
+
 uint64_t hypster(uint64_t* to_context) {
   uint64_t* from_context;
 
@@ -10533,6 +10572,30 @@ uint64_t hypster(uint64_t* to_context) {
     else
       // TODO: scheduler should go here
       to_context = from_context;
+  }
+}
+
+uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count) {
+  uint64_t* from_context;
+
+  print("hypster\n");
+  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
+
+  while (1) {
+    from_context = hypster_switch(to_context, CONCURRENT_TIMESLICE + 1);
+
+    if (handle_exception(from_context) == EXIT){
+      context_count = context_count - 1;
+      to_context = delete_context(from_context, used_contexts);
+      if (context_count < 1)
+        return get_exit_code(from_context);
+    }
+    else {
+      if (get_next_context(to_context) != (uint64_t*) 0)
+        to_context = get_next_context(to_context);
+      else
+        to_context = used_contexts;
+    }
   }
 }
 
@@ -10724,8 +10787,10 @@ void boot_loader(uint64_t* context) {
   up_load_arguments(context, number_of_remaining_arguments(), remaining_arguments());
 }
 
-uint64_t selfie_run(uint64_t machine) {
+uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   uint64_t exit_code;
+  uint64_t number_of_contexts;
+  number_of_contexts = context_numbers;
 
   if (binary_length == 0) {
     printf1("%s: nothing to run, debug, or host\n", selfie_name);
@@ -10742,6 +10807,11 @@ uint64_t selfie_run(uint64_t machine) {
   current_context = create_context(MY_CONTEXT, 0);
 
   // assert: number_of_remaining_arguments() > 0
+
+  while(number_of_contexts > 1){
+    boot_loader(create_context(MY_CONTEXT, 0));
+    number_of_contexts = number_of_contexts - 1;
+  }
 
   boot_loader(current_context);
 
@@ -10775,9 +10845,12 @@ uint64_t selfie_run(uint64_t machine) {
 
   run = 1;
 
-  if (machine == MIPSTER)
-    exit_code = mipster(current_context);
-  else if (machine == DIPSTER)
+  if (machine == MIPSTER) {
+    if (context_numbers > 1)
+      exit_code = mipster_concurrently(current_context, context_numbers);
+    else
+      exit_code = mipster(current_context);
+  } else if (machine == DIPSTER)
     exit_code = mipster(current_context);
   else if (machine == RIPSTER)
     exit_code = mipster(current_context);
@@ -10785,9 +10858,12 @@ uint64_t selfie_run(uint64_t machine) {
     exit_code = minster(current_context);
   else if (machine == MOBSTER)
     exit_code = mobster(current_context);
-  else if (machine == HYPSTER)
-    exit_code = hypster(current_context);
-  else
+  else if (machine == HYPSTER) {
+    if (context_numbers > 1)
+      exit_code = hypster_concurrently(current_context, context_numbers);
+    else
+      exit_code = hypster(current_context);
+  } else
     // change 0 to anywhere between 0% to 100% mipster
     exit_code = mixter(current_context, 0);
 
@@ -10893,17 +10969,21 @@ uint64_t selfie(uint64_t extras) {
         selfie_load();
       else if (extras == 0) {
         if (string_compare(argument, "-m"))
-          return selfie_run(MIPSTER);
+          return selfie_run(MIPSTER, 1);
         else if (string_compare(argument, "-d"))
-          return selfie_run(DIPSTER);
+          return selfie_run(DIPSTER, 1);
         else if (string_compare(argument, "-r"))
-          return selfie_run(RIPSTER);
+          return selfie_run(RIPSTER, 1);
         else if (string_compare(argument, "-y"))
-          return selfie_run(HYPSTER);
+          return selfie_run(HYPSTER, 1);
         else if (string_compare(argument, "-min"))
-          return selfie_run(MINSTER);
+          return selfie_run(MINSTER, 1);
         else if (string_compare(argument, "-mob"))
-          return selfie_run(MOBSTER);
+          return selfie_run(MOBSTER, 1);
+        else if (string_compare(argument, "-x"))
+          return selfie_run(MIPSTER, atoi(peek_argument(0)));
+        else if (string_compare(argument, "-z"))
+          return selfie_run(HYPSTER, atoi(peek_argument(0)));
         else
           return EXITCODE_BADARGUMENTS;
       } else
