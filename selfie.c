@@ -108,6 +108,22 @@ uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count);
 uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count);
 uint64_t CONCURRENT_TIMESLICE = 1;
 
+// -------------------------- ASSIGNMENT 4 -------------------------
+
+void emit_fork();
+void implement_fork(uint64_t* original_context);
+
+void emit_wait();
+void implement_wait(uint64_t* context);
+
+uint64_t SYSCALL_FORK   = 225;
+uint64_t SYSCALL_WAIT   = 226;
+
+uint64_t pid = 1;
+void new_pid() { pid = pid + 1; }
+uint64_t* copy_context(uint64_t* original, uint64_t address);
+void copy_page_frame(uint64_t* original_context, uint64_t* copied_context, uint64_t page);
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -1760,12 +1776,16 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from);
 // | 20 | free-list head  | pointer to head of free list
 // | 21 | gcs counter     | number of gc runs in gc period
 // | 22 | gc enabled      | flag indicating whether to use gc or not
+// | 23 | process ID      |
+// | 24 | parent process  |
+// | 25 | children        |
+// | 26 | process state   |
 // +----+-----------------+
 
 // CAUTION: contexts are extended in the symbolic execution engine!
 
 uint64_t* allocate_context() {
-  return smalloc(9 * SIZEOFUINT64STAR + 14 * SIZEOFUINT64);
+  return smalloc(11 * SIZEOFUINT64STAR + 16 * SIZEOFUINT64);
 }
 
 uint64_t next_context(uint64_t* context)    { return (uint64_t) context; }
@@ -1793,6 +1813,11 @@ uint64_t free_list_head(uint64_t* context)   { return (uint64_t) (context + 20);
 uint64_t gcs_in_period(uint64_t* context)    { return (uint64_t) (context + 21); }
 uint64_t use_gc_kernel(uint64_t* context)    { return (uint64_t) (context + 22); }
 
+uint64_t process_id(uint64_t* context)      { return (uint64_t) (context + 23); }
+uint64_t parent_process(uint64_t* context)  { return (uint64_t) (context + 24); }
+uint64_t children(uint64_t* context)        { return (uint64_t) (context + 25); }
+uint64_t process_state(uint64_t* context)   { return (uint64_t) (context + 26); }
+
 uint64_t* get_next_context(uint64_t* context)    { return (uint64_t*) *context; }
 uint64_t* get_prev_context(uint64_t* context)    { return (uint64_t*) *(context + 1); }
 uint64_t  get_pc(uint64_t* context)              { return             *(context + 2); }
@@ -1818,6 +1843,11 @@ uint64_t* get_free_list_head(uint64_t* context)   { return (uint64_t*) *(context
 uint64_t  get_gcs_in_period(uint64_t* context)    { return             *(context + 21); }
 uint64_t  get_use_gc_kernel(uint64_t* context)    { return             *(context + 22); }
 
+uint64_t  get_process_id(uint64_t* context)      { return             *(context + 23); }
+uint64_t* get_parent_process(uint64_t* context)  { return (uint64_t*) *(context + 24); }
+uint64_t* get_children(uint64_t* context)        { return (uint64_t*) *(context + 25); }
+uint64_t  get_process_state(uint64_t* context)   { return             *(context + 26); }
+
 void set_next_context(uint64_t* context, uint64_t* next)      { *context        = (uint64_t) next; }
 void set_prev_context(uint64_t* context, uint64_t* prev)      { *(context + 1)  = (uint64_t) prev; }
 void set_pc(uint64_t* context, uint64_t pc)                   { *(context + 2)  = pc; }
@@ -1842,6 +1872,11 @@ void set_used_list_head(uint64_t* context, uint64_t* used_list_head) { *(context
 void set_free_list_head(uint64_t* context, uint64_t* free_list_head) { *(context + 20) = (uint64_t) free_list_head; }
 void set_gcs_in_period(uint64_t* context, uint64_t gcs)              { *(context + 21) = gcs; }
 void set_use_gc_kernel(uint64_t* context, uint64_t use)              { *(context + 22) = use; }
+
+void set_process_id(uint64_t* context, uint64_t parent_process)         { *(context + 23) = parent_process; }
+void set_parent_process(uint64_t* context, uint64_t* parent_process)    { *(context + 24) = (uint64_t) parent_process; }
+void set_children(uint64_t* context, uint64_t* children)                { *(context + 25) = (uint64_t) children; }
+void set_process_state(uint64_t* context, uint64_t state)               { *(context + 26) = state; }
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -5822,6 +5857,8 @@ void selfie_compile() {
   emit_read();
   emit_write();
   emit_open();
+  emit_fork();
+  emit_wait();
 
   emit_malloc();
 
@@ -7024,6 +7061,85 @@ void implement_exit(uint64_t* context) {
   printf3("%s: %s exiting with exit code %d\n", selfie_name,
     get_name(context),
     (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
+}
+
+void emit_fork() {
+  create_symbol_table_entry(LIBRARY_TABLE, "fork", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_FORK);
+
+  emit_ecall();
+
+  // jump back to caller, return value is in REG_A0
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_fork (uint64_t* original_context) {
+  uint64_t count;
+  uint64_t* copied_context;
+
+  new_pid();
+
+  copied_context = copy_context(original_context, get_pc(original_context));
+
+  set_parent_process(copied_context, original_context);
+  // add_child_to_context(original_context, pid);
+
+  set_pt(copied_context, zalloc((VIRTUALMEMORYSIZE / PAGESIZE) * WORDSIZE));
+
+  count = get_lowest_lo_page(original_context);
+
+  while(count <= get_highest_lo_page(original_context)) {
+    copy_page_frame(original_context, copied_context, count);
+    count = count + 1;
+  }
+
+  count = get_lowest_hi_page(original_context);
+
+  while(count <= get_highest_hi_page(original_context)) {
+    copy_page_frame(original_context, copied_context, count);
+    count = count + 1;
+  }
+
+  *(get_regs(original_context) + REG_A0) = pid;
+  *(get_regs(copied_context) + REG_A0) = 0;
+
+  set_pc(original_context, get_pc(original_context) + INSTRUCTIONSIZE);
+  set_pc(copied_context, get_pc(copied_context) + INSTRUCTIONSIZE);
+}
+
+void copy_page_frame(uint64_t* original_context, uint64_t* copied_context, uint64_t page) {
+  uint64_t count;
+
+  count = 0;
+
+  while(count < PAGESIZE) {
+    if (is_virtual_address_mapped(get_pt(original_context), page * PAGESIZE + count))
+      map_and_store(copied_context, page * PAGESIZE + count, load_virtual_memory(get_pt(original_context), page * PAGESIZE + count));
+
+    count = count + WORDSIZE;
+  }
+}
+
+void emit_wait() {
+  create_symbol_table_entry(LIBRARY_TABLE, "wait", 0, PROCEDURE, VOID_T, 0, binary_length);
+
+  // load the correct syscall number and invoke syscall
+  emit_addi(REG_A7, REG_ZR, SYSCALL_WAIT);
+
+  emit_ecall();
+
+  // jump back to caller
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_wait(uint64_t* context) {
+  uint64_t address;
+  address = *(get_regs(context) + REG_A0);
+  // block the process
+  // set_processState(context, BLOCKED);
+  // set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+  return;
 }
 
 void emit_read() {
@@ -9907,6 +10023,50 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from) {
   return from;
 }
 
+uint64_t* copy_context(uint64_t* original, uint64_t address) {
+  uint64_t* context;
+  uint64_t r;
+
+  context = new_context();
+
+  set_regs(context, smalloc(NUMBEROFREGISTERS * WORDSIZE));
+
+  r = 0;
+
+  while (r < NUMBEROFREGISTERS) {
+    *(get_regs(context) + r) = *(get_regs(original) + r);
+
+    r = r + 1;
+  }
+
+  set_lowest_lo_page(context, get_lowest_lo_page(original));
+  set_highest_lo_page(context, get_highest_lo_page(original));
+  set_lowest_hi_page(context, get_lowest_hi_page(original));
+  set_highest_hi_page(context, get_highest_hi_page(original));
+  set_code_seg_start(context, get_code_seg_start(original));
+  set_data_seg_start(context, get_data_seg_start(original));
+  set_heap_seg_start(context, get_heap_seg_start(original));
+  set_program_break(context, get_program_break(original));
+  set_exception(context, get_exception(original));
+  set_fault(context, get_fault(original));
+  set_exit_code(context, get_exit_code(original));
+  set_parent_process(context, get_parent_process(original));
+  set_virtual_context(context, get_virtual_context(original));
+  set_name(context, get_name(original));
+
+  r = 0;
+
+  while (r < NUMBEROFREGISTERS) {
+    *(get_regs(context) + r) = *(get_regs(original) + r);
+
+    r = r + 1;
+  }
+
+  set_pc(context, address);
+
+  return context;
+}
+
 void print_my_name() {
   printf2("%s: This is %s's Selfie\n", selfie_name, "Muhammed Ali");
 }
@@ -10417,6 +10577,10 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
+  else if (a7 == SYSCALL_FORK)
+    implement_fork(context);
+  else if (a7 == SYSCALL_WAIT)
+    implement_wait(context);
   else if (a7 == SYSCALL_EXIT) {
     implement_exit(context);
 
@@ -10517,8 +10681,10 @@ uint64_t mipster(uint64_t* to_context) {
     } else if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else {
-      // TODO: scheduler should go here
-      to_context = from_context;
+      if (get_next_context(to_context) != (uint64_t*) 0)
+        to_context = get_next_context(to_context);
+      else
+        to_context = used_contexts;
 
       timeout = TIMESLICE;
     }
@@ -10570,8 +10736,10 @@ uint64_t hypster(uint64_t* to_context) {
     if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else
-      // TODO: scheduler should go here
-      to_context = from_context;
+      if (get_next_context(to_context) != (uint64_t*) 0)
+        to_context = get_next_context(to_context);
+      else
+        to_context = used_contexts;
   }
 }
 
@@ -10805,6 +10973,7 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   init_memory(atoi(peek_argument(0)));
 
   current_context = create_context(MY_CONTEXT, 0);
+  new_pid();
 
   // assert: number_of_remaining_arguments() > 0
 
