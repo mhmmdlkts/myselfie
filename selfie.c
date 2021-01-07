@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2015-2020, the Selfie Project authors. All rights reserved.
+Copyright (c) 2015-2021, the Selfie Project authors. All rights reserved.
 Please see the AUTHORS file for details. Use of this source code is
 governed by a BSD license that can be found in the LICENSE file.
 
@@ -129,6 +129,16 @@ uint64_t check_exit(uint64_t* context);
 uint64_t STATUS_READY   = 0;
 uint64_t STATUS_BLOCK   = 1;
 uint64_t STATUS_ZOMBIE  = 2;
+
+// -------------------------- ASSIGNMENT 6 -------------------------
+
+uint64_t SYSCALL_LOCK   = 227;
+uint64_t SYSCALL_UNLOCK = 228;
+
+void emit_lock();
+void implement_lock(uint64_t *context);
+void emit_unlock();
+void implement_unlock(uint64_t *context);
 
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
@@ -1306,7 +1316,7 @@ void gc_arguments();
 // ----------------------- LIBRARY FUNCTIONS -----------------------
 
 uint64_t* gc_malloc(uint64_t size) {
-    return gc_malloc_implementation((uint64_t*) 0, size);
+  return gc_malloc_implementation((uint64_t*) 0, size);
 }
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
@@ -3355,10 +3365,10 @@ void get_symbol() {
 
         if (integer_is_signed)
           if (literal > INT64_MIN) {
-              syntax_error_message("signed integer out of bound");
+            syntax_error_message("signed integer out of bound");
 
-              exit(EXITCODE_SCANNERERROR);
-            }
+            exit(EXITCODE_SCANNERERROR);
+          }
 
         symbol = SYM_INTEGER;
 
@@ -4314,7 +4324,7 @@ uint64_t compile_factor() {
       else
         syntax_error_symbol(SYM_RPARENTHESIS);
 
-    // not a cast: "(" expression ")"
+      // not a cast: "(" expression ")"
     } else {
       type = compile_expression();
 
@@ -4374,7 +4384,7 @@ uint64_t compile_factor() {
       // variable access: identifier
       type = load_variable_or_big_int(variable_or_procedure_name, VARIABLE);
 
-  // integer literal?
+    // integer literal?
   } else if (symbol == SYM_INTEGER) {
     load_integer(literal);
 
@@ -4382,7 +4392,7 @@ uint64_t compile_factor() {
 
     type = UINT64_T;
 
-  // character literal?
+    // character literal?
   } else if (symbol == SYM_CHARACTER) {
     talloc();
 
@@ -4392,7 +4402,7 @@ uint64_t compile_factor() {
 
     type = UINT64_T;
 
-  // string literal?
+    // string literal?
   } else if (symbol == SYM_STRING) {
     load_string(string);
 
@@ -4400,7 +4410,7 @@ uint64_t compile_factor() {
 
     type = UINT64STAR_T;
 
-  //  "(" expression ")"
+    //  "(" expression ")"
   } else if (symbol == SYM_LPARENTHESIS) {
     get_symbol();
 
@@ -4741,7 +4751,7 @@ void compile_if() {
             exit(EXITCODE_PARSERERROR);
           }
         } else
-        // only one statement without {}
+          // only one statement without {}
           compile_statement();
 
         //optional: else
@@ -4772,7 +4782,7 @@ void compile_if() {
               exit(EXITCODE_PARSERERROR);
             }
 
-          // only one statement without {}
+            // only one statement without {}
           } else
             compile_statement();
 
@@ -4884,7 +4894,7 @@ void compile_statement() {
       else
         syntax_error_symbol(SYM_SEMICOLON);
 
-    // "*" "(" expression ")"
+      // "*" "(" expression ")"
     } else if (symbol == SYM_LPARENTHESIS) {
       get_symbol();
 
@@ -4925,7 +4935,7 @@ void compile_statement() {
     } else
       syntax_error_symbol(SYM_LPARENTHESIS);
   }
-  // variable "=" expression | call
+    // variable "=" expression | call
   else if (symbol == SYM_IDENTIFIER) {
     variable_or_procedure_name = identifier;
 
@@ -4946,7 +4956,7 @@ void compile_statement() {
       else
         syntax_error_symbol(SYM_SEMICOLON);
 
-    // variable = expression
+      // variable = expression
     } else if (symbol == SYM_ASSIGN) {
       entry = get_variable_or_big_int(variable_or_procedure_name, VARIABLE);
 
@@ -4982,15 +4992,15 @@ void compile_statement() {
     } else
       syntax_error_unexpected();
   }
-  // while statement?
+    // while statement?
   else if (symbol == SYM_WHILE) {
     compile_while();
   }
-  // if statement?
+    // if statement?
   else if (symbol == SYM_IF) {
     compile_if();
   }
-  // return statement?
+    // return statement?
   else if (symbol == SYM_RETURN) {
     compile_return();
 
@@ -5863,6 +5873,8 @@ void selfie_compile() {
   emit_read();
   emit_write();
   emit_open();
+  emit_lock();
+  emit_unlock();
   emit_fork();
   emit_wait();
 
@@ -5912,26 +5924,26 @@ void selfie_compile() {
       compile_cstar();
 
       printf4("%s: %u characters read in %u lines and %u comments\n", selfie_name,
-        (char*) number_of_read_characters,
-        (char*) line_number,
-        (char*) number_of_comments);
+              (char*) number_of_read_characters,
+              (char*) line_number,
+              (char*) number_of_comments);
 
       printf4("%s: with %u(%.2u%%) characters in %u actual symbols\n", selfie_name,
-        (char*) (number_of_read_characters - number_of_ignored_characters),
-        (char*) fixed_point_percentage(fixed_point_ratio(number_of_read_characters, number_of_read_characters - number_of_ignored_characters, 4), 4),
-        (char*) number_of_scanned_symbols);
+              (char*) (number_of_read_characters - number_of_ignored_characters),
+              (char*) fixed_point_percentage(fixed_point_ratio(number_of_read_characters, number_of_read_characters - number_of_ignored_characters, 4), 4),
+              (char*) number_of_scanned_symbols);
 
       printf4("%s: %u global variables, %u procedures, %u string literals\n", selfie_name,
-        (char*) number_of_global_variables,
-        (char*) number_of_procedures,
-        (char*) number_of_strings);
+              (char*) number_of_global_variables,
+              (char*) number_of_procedures,
+              (char*) number_of_strings);
 
       printf6("%s: %u calls, %u assignments, %u while, %u if, %u return\n", selfie_name,
-        (char*) number_of_calls,
-        (char*) number_of_assignments,
-        (char*) number_of_while,
-        (char*) number_of_if,
-        (char*) number_of_return);
+              (char*) number_of_calls,
+              (char*) number_of_assignments,
+              (char*) number_of_while,
+              (char*) number_of_if,
+              (char*) number_of_return);
     }
   }
 
@@ -5950,13 +5962,13 @@ void selfie_compile() {
   entry_point = ELF_ENTRY_POINT;
 
   printf3("%s: symbol table search time was %u iterations on average and %u in total\n", selfie_name,
-    (char*) (total_search_time / number_of_searches),
-    (char*) total_search_time);
+          (char*) (total_search_time / number_of_searches),
+          (char*) total_search_time);
 
   printf4("%s: %u bytes generated with %u instructions and %u bytes of data\n", selfie_name,
-    (char*) binary_length,
-    (char*) (code_length / INSTRUCTIONSIZE),
-    (char*) (binary_length - code_length));
+          (char*) binary_length,
+          (char*) (code_length / INSTRUCTIONSIZE),
+          (char*) (binary_length - code_length));
 
   print_instruction_counters();
 }
@@ -6158,9 +6170,9 @@ void check_immediate_range(uint64_t immediate, uint64_t bits) {
   if (is_signed_integer(immediate, bits) == 0) {
     print_line_number("encoding error", line_number);
     printf3("%d expected between %d and %d\n",
-      (char*) immediate,
-      (char*) -two_to_the_power_of(bits - 1),
-      (char*) (two_to_the_power_of(bits - 1) - 1));
+            (char*) immediate,
+            (char*) -two_to_the_power_of(bits - 1),
+            (char*) (two_to_the_power_of(bits - 1) - 1));
 
     exit(EXITCODE_COMPILERERROR);
   }
@@ -6475,14 +6487,14 @@ uint64_t get_total_number_of_instructions() {
 
 uint64_t get_total_percentage_of_nops() {
   return fixed_point_percentage(fixed_point_ratio(get_total_number_of_instructions(),
-    nopc_lui + nopc_addi + nopc_add + nopc_sub + nopc_mul + nopc_divu + nopc_remu + nopc_sltu + nopc_ld + nopc_sd + nopc_beq + nopc_jal + nopc_jalr, 4), 4);
+                                                  nopc_lui + nopc_addi + nopc_add + nopc_sub + nopc_mul + nopc_divu + nopc_remu + nopc_sltu + nopc_ld + nopc_sd + nopc_beq + nopc_jal + nopc_jalr, 4), 4);
 }
 
 void print_instruction_counter(uint64_t total, uint64_t counter, char* mnemonics) {
   printf3("%s: %u(%.2u%%)",
-    mnemonics,
-    (char*) counter,
-    (char*) fixed_point_percentage(fixed_point_ratio(total, counter, 4), 4));
+          mnemonics,
+          (char*) counter,
+          (char*) fixed_point_percentage(fixed_point_ratio(total, counter, 4), 4));
 }
 
 void print_instruction_counter_with_nops(uint64_t total, uint64_t counter, uint64_t nops, char* mnemonics) {
@@ -6692,11 +6704,11 @@ void fixup_relative_BFormat(uint64_t from_address) {
   instruction = load_instruction(from_address);
 
   store_instruction(from_address,
-    encode_b_format(binary_length - from_address,
-      get_rs2(instruction),
-      get_rs1(instruction),
-      get_funct3(instruction),
-      get_opcode(instruction)));
+                    encode_b_format(binary_length - from_address,
+                                    get_rs2(instruction),
+                                    get_rs1(instruction),
+                                    get_funct3(instruction),
+                                    get_opcode(instruction)));
 }
 
 void fixup_relative_JFormat(uint64_t from_address, uint64_t to_address) {
@@ -6705,9 +6717,9 @@ void fixup_relative_JFormat(uint64_t from_address, uint64_t to_address) {
   instruction = load_instruction(from_address);
 
   store_instruction(from_address,
-    encode_j_format(to_address - from_address,
-      get_rd(instruction),
-      get_opcode(instruction)));
+                    encode_j_format(to_address - from_address,
+                                    get_rd(instruction),
+                                    get_opcode(instruction)));
 }
 
 void fixlink_relative(uint64_t from_address, uint64_t to_address) {
@@ -6797,26 +6809,26 @@ uint64_t* create_elf_header(uint64_t binary_length, uint64_t code_length) {
 
   // RISC-U ELF64 file header:
   *(header + 0) = 127                               // magic number part 0 is 0x7F
-                + left_shift((uint64_t) 'E', 8)     // magic number part 1
-                + left_shift((uint64_t) 'L', 16)    // magic number part 2
-                + left_shift((uint64_t) 'F', 24)    // magic number part 3
-                + left_shift(2, 32)                 // file class is ELFCLASS64
-                + left_shift(1, 40)                 // object file data structures endianness is ELFDATA2LSB
-                + left_shift(1, 48);                // version of the object file format
+                  + left_shift((uint64_t) 'E', 8)     // magic number part 1
+                  + left_shift((uint64_t) 'L', 16)    // magic number part 2
+                  + left_shift((uint64_t) 'F', 24)    // magic number part 3
+                  + left_shift(2, 32)                 // file class is ELFCLASS64
+                  + left_shift(1, 40)                 // object file data structures endianness is ELFDATA2LSB
+                  + left_shift(1, 48);                // version of the object file format
   *(header + 1) = 0;                                // ABI version and start of padding bytes
   *(header + 2) = 2                                 // object file type is ET_EXEC
-                + left_shift(243, 16)               // target architecture is RV64
-                + left_shift(1, 32);                // version of the object file format
+                  + left_shift(243, 16)               // target architecture is RV64
+                  + left_shift(1, 32);                // version of the object file format
   *(header + 3) = ELF_ENTRY_POINT;                  // entry point address
   *(header + 4) = 8 * SIZEOFUINT64;                 // program header offset
   *(header + 5) = 0;                                // section header offset
   *(header + 6) = left_shift(8 * SIZEOFUINT64, 32)  // elf header size
-                + left_shift(7 * SIZEOFUINT64, 48); // size of program header entry
+                  + left_shift(7 * SIZEOFUINT64, 48); // size of program header entry
   *(header + 7) = 1;                                // number of program header entries
 
   // RISC-U ELF64 program header table:
   *(header + 8)  = 1                              // type of segment is LOAD
-                 + left_shift(7, 32);             // segment attributes is RWX
+                   + left_shift(7, 32);             // segment attributes is RWX
   *(header + 9)  = ELF_HEADER_LEN;                // segment offset in file (must be page-aligned)
   *(header + 10) = ELF_ENTRY_POINT;               // virtual address in memory
   *(header + 11) = 0;                             // physical address (reserved)
@@ -6929,10 +6941,10 @@ void selfie_output(char* filename) {
   }
 
   printf5("%s: %u bytes with %u instructions and %u bytes of data written into %s\n", selfie_name,
-    (char*) (ELF_HEADER_LEN + binary_length),
-    (char*) (code_length / INSTRUCTIONSIZE),
-    (char*) (binary_length - code_length),
-    binary_name);
+          (char*) (ELF_HEADER_LEN + binary_length),
+          (char*) (code_length / INSTRUCTIONSIZE),
+          (char*) (binary_length - code_length),
+          binary_name);
 }
 
 uint64_t* touch(uint64_t* memory, uint64_t length) {
@@ -7010,11 +7022,11 @@ void selfie_load() {
           // check if we are really at EOF
           if (read(fd, binary_buffer, SIZEOFUINT64) == 0) {
             printf5("%s: %u bytes with %u instructions and %u bytes of data loaded from %s\n",
-              selfie_name,
-              (char*) (ELF_HEADER_LEN + binary_length),
-              (char*) (code_length / INSTRUCTIONSIZE),
-              (char*) (binary_length - code_length),
-              binary_name);
+                    selfie_name,
+                    (char*) (ELF_HEADER_LEN + binary_length),
+                    (char*) (code_length / INSTRUCTIONSIZE),
+                    (char*) (binary_length - code_length),
+                    binary_name);
 
             return;
           }
@@ -7065,8 +7077,41 @@ void implement_exit(uint64_t* context) {
 
   printf1("%s: <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n", selfie_name);
   printf3("%s: %s exiting with exit code %d\n", selfie_name,
-    get_name(context),
-    (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
+          get_name(context),
+          (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
+}
+
+void emit_lock()
+{
+  create_symbol_table_entry(LIBRARY_TABLE, "lock", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_LOCK);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_lock(uint64_t *context)
+{
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+}
+
+void emit_unlock()
+{
+  create_symbol_table_entry(LIBRARY_TABLE, "unlock", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_UNLOCK);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_unlock(uint64_t *context)
+{
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 }
 
 void emit_fork() {
@@ -7194,9 +7239,9 @@ void implement_read(uint64_t* context) {
 
   if (debug_read)
     printf4("%s: trying to read %u bytes from file with descriptor %u into buffer at virtual address %p\n", selfie_name,
-      (char*) size,
-      (char*) fd,
-      (char*) vbuffer);
+            (char*) size,
+            (char*) fd,
+            (char*) vbuffer);
 
   read_total = 0;
 
@@ -7317,9 +7362,9 @@ void implement_write(uint64_t* context) {
 
   if (debug_write)
     printf4("%s: trying to write %u bytes from buffer at virtual address %p into file with descriptor %u\n", selfie_name,
-      (char*) size,
-      (char*) vbuffer,
-      (char*) fd);
+            (char*) size,
+            (char*) vbuffer,
+            (char*) fd);
 
   written_total = 0;
 
@@ -7505,10 +7550,10 @@ void implement_openat(uint64_t* context) {
 
     if (debug_open)
       printf5("%s: opened file %s with flags %x and mode %o returning file descriptor %u\n", selfie_name,
-        filename_buffer,
-        (char*) flags,
-        (char*) mode,
-        (char*) fd);
+              filename_buffer,
+              (char*) flags,
+              (char*) mode,
+              (char*) fd);
   } else
     *(get_regs(context) + REG_A0) = sign_shrink(-1, SYSCALL_BITWIDTH);
 
@@ -7713,8 +7758,8 @@ uint64_t* do_switch(uint64_t* from_context, uint64_t* to_context, uint64_t timeo
 
   if (debug_switch) {
     printf3("%s: switched from context %p to context %p", selfie_name,
-      (char*) from_context,
-      (char*) to_context);
+            (char*) from_context,
+            (char*) to_context);
     if (timer != TIMEROFF)
       printf1(" to execute %u instructions", (char*) timer);
     println();
@@ -7912,10 +7957,10 @@ uint64_t* tlb(uint64_t* table, uint64_t vaddr) {
 
   if (debug_tlb)
     printf5("%s: tlb access:\n vaddr: %p\n page:  %p\n frame: %p\n paddr: %p\n", selfie_name,
-      (char*) vaddr,
-      (char*) (page * PAGESIZE),
-      (char*) frame,
-      (char*) paddr);
+            (char*) vaddr,
+            (char*) (page * PAGESIZE),
+            (char*) frame,
+            (char*) paddr);
 
   return (uint64_t*) paddr;
 }
@@ -8198,10 +8243,10 @@ uint64_t gc_load_memory(uint64_t* context, uint64_t address) {
     return *((uint64_t*) address);
   else
     // assert: is_valid_virtual_address(address) == 1
-    if (is_virtual_address_mapped(get_pt(context), address))
-      return load_virtual_memory(get_pt(context), address);
-    else
-      return 0;
+  if (is_virtual_address_mapped(get_pt(context), address))
+    return load_virtual_memory(get_pt(context), address);
+  else
+    return 0;
 }
 
 void gc_store_memory(uint64_t* context, uint64_t address, uint64_t value) {
@@ -8209,8 +8254,8 @@ void gc_store_memory(uint64_t* context, uint64_t address, uint64_t value) {
     *((uint64_t*) address) = value;
   else
     // assert: is_valid_virtual_address(address) == 1
-    if (is_virtual_address_mapped(get_pt(context), address))
-      store_virtual_memory(get_pt(context), address, value);
+  if (is_virtual_address_mapped(get_pt(context), address))
+    store_virtual_memory(get_pt(context), address, value);
 }
 
 void zero_object(uint64_t* context, uint64_t* metadata) {
@@ -8481,31 +8526,31 @@ void gc_collect(uint64_t* context) {
 void print_gc_profile(uint64_t* context) {
   printf1("%s: --------------------------------------------------------------------------------\n", selfie_name);
   printf5("%s: gc:      %.2uMB requested in %u mallocs (%u gced, %u reuses)\n", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_mallocated, MEGABYTE, 2),
-    (char*) gc_num_mallocated,
-    (char*) gc_num_gced_mallocs,
-    (char*) gc_num_reused_mallocs);
+          (char*) fixed_point_ratio(gc_mem_mallocated, MEGABYTE, 2),
+          (char*) gc_num_mallocated,
+          (char*) gc_num_gced_mallocs,
+          (char*) gc_num_reused_mallocs);
   printf4("%s: gc:      %.2uMB(%.2u%%) reused in %u reused mallocs\n", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_reused, MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_reused, 4), 4),
-    (char*) gc_num_reused_mallocs);
+          (char*) fixed_point_ratio(gc_mem_reused, MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_reused, 4), 4),
+          (char*) gc_num_reused_mallocs);
   printf3("%s: gc:      %.2uMB collected in %u gc runs\n", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_collected, MEGABYTE, 2),
-    (char*) gc_num_collects);
+          (char*) fixed_point_ratio(gc_mem_collected, MEGABYTE, 2),
+          (char*) gc_num_collects);
   printf6("%s: gc:      %.2uMB(%.2u%%) allocated in %u mallocs (%u gced, %u ungced)\n", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_objects + gc_mem_metadata, MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_objects + gc_mem_metadata, 4), 4),
-    (char*) (gc_num_gced_mallocs + gc_num_ungced_mallocs),
-    (char*) gc_num_gced_mallocs,
-    (char*) gc_num_ungced_mallocs);
+          (char*) fixed_point_ratio(gc_mem_objects + gc_mem_metadata, MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_objects + gc_mem_metadata, 4), 4),
+          (char*) (gc_num_gced_mallocs + gc_num_ungced_mallocs),
+          (char*) gc_num_gced_mallocs,
+          (char*) gc_num_ungced_mallocs);
   printf4("%s: gc:      %.2uMB(%.2u%%) allocated in %u gced mallocs\n", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_objects, MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_objects, 4), 4),
-    (char*) gc_num_gced_mallocs);
+          (char*) fixed_point_ratio(gc_mem_objects, MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_objects, 4), 4),
+          (char*) gc_num_gced_mallocs);
   printf4("%s: gc:      %.2uMB(%.2u%%) allocated in %u ungced mallocs", selfie_name,
-    (char*) fixed_point_ratio(gc_mem_metadata, MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_metadata, 4), 4),
-    (char*) gc_num_ungced_mallocs);
+          (char*) fixed_point_ratio(gc_mem_metadata, MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(gc_mem_mallocated, gc_mem_metadata, 4), 4),
+          (char*) gc_num_ungced_mallocs);
   if (is_gc_library(context) == 0)
     print(" (external)");
   println();
@@ -9317,10 +9362,10 @@ void selfie_disassemble(uint64_t verbose) {
   output_fd   = 1;
 
   printf5("%s: %u characters of assembly with %u instructions and %u bytes of data written into %s\n", selfie_name,
-    (char*) number_of_written_characters,
-    (char*) (code_length / INSTRUCTIONSIZE),
-    (char*) (binary_length - code_length),
-    assembly_name);
+          (char*) number_of_written_characters,
+          (char*) (code_length / INSTRUCTIONSIZE),
+          (char*) (binary_length - code_length),
+          assembly_name);
 }
 
 // -----------------------------------------------------------------
@@ -9798,7 +9843,7 @@ void print_access_profile(char* message, char* padding, uint64_t reads, uint64_t
       writes = 1;
 
     printf7("%s: %s%s%d,%d,%d[%.2u]\n", selfie_name, message, padding,
-      (char*) (reads + writes), (char*) reads, (char*) writes, (char*) fixed_point_ratio(reads, writes, 2));
+            (char*) (reads + writes), (char*) reads, (char*) writes, (char*) fixed_point_ratio(reads, writes, 2));
   }
 }
 
@@ -9866,19 +9911,19 @@ void print_register_memory_profile() {
 void print_profile(uint64_t* context) {
   printf1("%s: --------------------------------------------------------------------------------\n", selfie_name);
   printf3("%s: summary: %u executed instructions [%.2u%% nops]\n", selfie_name,
-    (char*) get_total_number_of_instructions(),
-    (char*) get_total_percentage_of_nops());
+          (char*) get_total_number_of_instructions(),
+          (char*) get_total_percentage_of_nops());
   printf3("%s:          %.2uMB allocated in %u mallocs\n", selfie_name,
-    (char*) fixed_point_ratio(mc_brk, MEGABYTE, 2),
-    (char*) sc_brk);
+          (char*) fixed_point_ratio(mc_brk, MEGABYTE, 2),
+          (char*) sc_brk);
   printf4("%s:          %.2uMB(%.2u%% of %.2uMB) actually accessed\n", selfie_name,
-    (char*) fixed_point_ratio(mc_mapped_heap, MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(round_up(mc_brk, PAGESIZE), mc_mapped_heap, 4), 4),
-    (char*) fixed_point_ratio(mc_brk, MEGABYTE, 2));
+          (char*) fixed_point_ratio(mc_mapped_heap, MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(round_up(mc_brk, PAGESIZE), mc_mapped_heap, 4), 4),
+          (char*) fixed_point_ratio(mc_brk, MEGABYTE, 2));
   printf4("%s:          %.2uMB(%.2u%% of %uMB) mapped memory\n", selfie_name,
-    (char*) fixed_point_ratio(pused(), MEGABYTE, 2),
-    (char*) fixed_point_percentage(fixed_point_ratio(total_page_frame_memory, pused(), 4), 4),
-    (char*) (total_page_frame_memory / MEGABYTE));
+          (char*) fixed_point_ratio(pused(), MEGABYTE, 2),
+          (char*) fixed_point_percentage(fixed_point_ratio(total_page_frame_memory, pused(), 4), 4),
+          (char*) (total_page_frame_memory / MEGABYTE));
 
   if (GC_ON)
     print_gc_profile(context);
@@ -10122,8 +10167,8 @@ uint64_t* create_context(uint64_t* parent, uint64_t* vctxt) {
 
   if (debug_create)
     printf3("%s: parent context %p created child context %p\n", selfie_name,
-      (char*) parent,
-      (char*) used_contexts);
+            (char*) parent,
+            (char*) used_contexts);
 
   return context;
 }
@@ -10641,6 +10686,10 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_fork(context);
   else if (a7 == SYSCALL_WAIT)
     implement_wait(context);
+  else if (a7 == SYSCALL_LOCK)
+    implement_lock(context);
+  else if (a7 == SYSCALL_UNLOCK)
+    implement_unlock(context);
   else if (a7 == SYSCALL_EXIT) {
     implement_exit(context);
     return check_exit(context);
@@ -10778,11 +10827,11 @@ uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count) {
 
       timeout = TIMEROFF;
     } else if (handle_exception(from_context) == EXIT) {
-        context_count = context_count - 1;
-        to_context = delete_context(from_context, used_contexts);
-        timeout = CONCURRENT_TIMESLICE;
-        if (context_count < 1)
-          return get_exit_code(from_context);
+      context_count = context_count - 1;
+      to_context = delete_context(from_context, used_contexts);
+      timeout = CONCURRENT_TIMESLICE;
+      if (context_count < 1)
+        return get_exit_code(from_context);
     } else {
       if (get_next_context(from_context) != (uint64_t*) 0)
         to_context = get_next_context(from_context);
@@ -10806,10 +10855,10 @@ uint64_t hypster(uint64_t* to_context) {
     if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else
-      if (get_next_context(from_context) != (uint64_t*) 0)
-        to_context = get_next_context(from_context);
-      else
-        to_context = used_contexts;
+    if (get_next_context(from_context) != (uint64_t*) 0)
+      to_context = get_next_context(from_context);
+    else
+      to_context = used_contexts;
   }
 }
 
@@ -11055,8 +11104,8 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   boot_loader(current_context);
 
   printf3("%s: selfie executing %s with %uMB physical memory", selfie_name,
-    binary_name,
-    (char*) (total_page_frame_memory / MEGABYTE));
+          binary_name,
+          (char*) (total_page_frame_memory / MEGABYTE));
 
   if (GC_ON) {
     gc_init(current_context);
@@ -11114,8 +11163,8 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   debug          = 0;
 
   printf3("%s: selfie terminating %s with exit code %d\n", selfie_name,
-    get_name(current_context),
-    (char*) sign_extend(exit_code, SYSCALL_BITWIDTH));
+          get_name(current_context),
+          (char*) sign_extend(exit_code, SYSCALL_BITWIDTH));
 
   if (machine != HYPSTER)
     print_profile(current_context);
