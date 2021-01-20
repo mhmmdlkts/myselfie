@@ -79,6 +79,34 @@ Jochen Liedtke from University of Karlsruhe. The garbage collector
 is inspired by the conservative garbage collector of Hans Boehm.
 */
 
+// -------------------------- ASSIGNMENT 3 -------------------------
+
+uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count);
+uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count);
+uint64_t CONCURRENT_TIMESLICE = 1;
+
+// -------------------------- ASSIGNMENT 4 -------------------------
+
+void emit_fork();
+void implement_fork(uint64_t* original_context);
+
+void emit_wait();
+uint64_t implement_wait(uint64_t* context);
+
+uint64_t SYSCALL_FORK   = 225;
+uint64_t SYSCALL_WAIT   = 226;
+
+uint64_t pid = 1;
+void new_pid() { pid = pid + 1; }
+uint64_t* copy_context(uint64_t* original);
+
+// -------------------------- ASSIGNMENT 5 -------------------------
+
+uint64_t check_exit(uint64_t* context);
+uint64_t STATUS_READY   = 0;
+uint64_t STATUS_BLOCK   = 1;
+uint64_t STATUS_ZOMBIE  = 2;
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -1692,12 +1720,16 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from);
 // | 20 | free-list head  | pointer to head of free list
 // | 21 | gcs counter     | number of gc runs in gc period
 // | 22 | gc enabled      | flag indicating whether to use gc or not
+// | 23 | process ID      |
+// | 24 | parent process  |
+// | 25 | children        |
+// | 26 | process state   |
 // +----+-----------------+
 
 // CAUTION: contexts are extended in the symbolic execution engine!
 
 uint64_t* allocate_context() {
-  return smalloc(9 * SIZEOFUINT64STAR + 14 * SIZEOFUINT64);
+  return smalloc(11 * SIZEOFUINT64STAR + 16 * SIZEOFUINT64);
 }
 
 uint64_t next_context(uint64_t* context)    { return (uint64_t) context; }
@@ -1725,6 +1757,11 @@ uint64_t free_list_head(uint64_t* context)   { return (uint64_t) (context + 20);
 uint64_t gcs_in_period(uint64_t* context)    { return (uint64_t) (context + 21); }
 uint64_t use_gc_kernel(uint64_t* context)    { return (uint64_t) (context + 22); }
 
+uint64_t process_id(uint64_t* context)      { return (uint64_t) (context + 23); }
+uint64_t parent_process(uint64_t* context)  { return (uint64_t) (context + 24); }
+uint64_t children(uint64_t* context)        { return (uint64_t) (context + 25); }
+uint64_t process_state(uint64_t* context)   { return (uint64_t) (context + 26); }
+
 uint64_t* get_next_context(uint64_t* context)    { return (uint64_t*) *context; }
 uint64_t* get_prev_context(uint64_t* context)    { return (uint64_t*) *(context + 1); }
 uint64_t  get_pc(uint64_t* context)              { return             *(context + 2); }
@@ -1750,6 +1787,11 @@ uint64_t* get_free_list_head(uint64_t* context)   { return (uint64_t*) *(context
 uint64_t  get_gcs_in_period(uint64_t* context)    { return             *(context + 21); }
 uint64_t  get_use_gc_kernel(uint64_t* context)    { return             *(context + 22); }
 
+uint64_t  get_process_id(uint64_t* context)      { return             *(context + 23); }
+uint64_t* get_parent_process(uint64_t* context)  { return (uint64_t*) *(context + 24); }
+uint64_t* get_children(uint64_t* context)        { return (uint64_t*) *(context + 25); }
+uint64_t  get_process_state(uint64_t* context)   { return             *(context + 26); }
+
 void set_next_context(uint64_t* context, uint64_t* next)      { *context        = (uint64_t) next; }
 void set_prev_context(uint64_t* context, uint64_t* prev)      { *(context + 1)  = (uint64_t) prev; }
 void set_pc(uint64_t* context, uint64_t pc)                   { *(context + 2)  = pc; }
@@ -1774,6 +1816,11 @@ void set_used_list_head(uint64_t* context, uint64_t* used_list_head) { *(context
 void set_free_list_head(uint64_t* context, uint64_t* free_list_head) { *(context + 20) = (uint64_t) free_list_head; }
 void set_gcs_in_period(uint64_t* context, uint64_t gcs)              { *(context + 21) = gcs; }
 void set_use_gc_kernel(uint64_t* context, uint64_t use)              { *(context + 22) = use; }
+
+void set_process_id(uint64_t* context, uint64_t parent_process)         { *(context + 23) = parent_process; }
+void set_parent_process(uint64_t* context, uint64_t* parent_process)    { *(context + 24) = (uint64_t) parent_process; }
+void set_children(uint64_t* context, uint64_t* children)                { *(context + 25) = (uint64_t) children; }
+void set_process_state(uint64_t* context, uint64_t state)               { *(context + 26) = state; }
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -1861,7 +1908,7 @@ char* replace_extension(char* filename, char* extension);
 
 void boot_loader(uint64_t* context);
 
-uint64_t selfie_run(uint64_t machine);
+uint64_t selfie_run(uint64_t machine, uint64_t context_numbers);
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
@@ -5257,6 +5304,8 @@ void selfie_compile() {
   emit_read();
   emit_write();
   emit_open();
+  emit_fork();
+  emit_wait();
 
   emit_malloc();
 
@@ -6356,6 +6405,93 @@ void implement_exit(uint64_t* context) {
   printf3("%s: %s exiting with exit code %d\n", selfie_name,
           get_name(context),
           (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
+}
+
+void emit_fork() {
+  create_symbol_table_entry(LIBRARY_TABLE, "fork", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_FORK);
+
+  emit_ecall();
+
+  // jump back to caller, return value is in REG_A0
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_fork (uint64_t* original_context) {
+  uint64_t* copied_context;
+  copied_context = copy_context(original_context);
+}
+
+void copy_page_frame(uint64_t* original_context, uint64_t* copied_context, uint64_t page) {
+  uint64_t count;
+
+  count = 0;
+
+  while(count < PAGESIZE) {
+    if (is_virtual_address_mapped(get_pt(original_context), page * PAGESIZE + count))
+      map_and_store(copied_context, page * PAGESIZE + count, load_virtual_memory(get_pt(original_context), page * PAGESIZE + count));
+
+    count = count + WORDSIZE;
+  }
+}
+
+void emit_wait() {
+  create_symbol_table_entry(LIBRARY_TABLE, "wait", 0, PROCEDURE, VOID_T, 0, binary_length);
+
+  emit_ld(REG_A0, REG_SP, 0);
+  emit_addi(REG_SP, REG_SP, WORDSIZE);
+
+  // load the correct syscall number and invoke syscall
+  emit_addi(REG_A7, REG_ZR, SYSCALL_WAIT);
+
+  emit_ecall();
+
+  // jump back to caller
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+uint64_t implement_wait(uint64_t* context) {
+  uint64_t address;
+  uint64_t has_child;
+  uint64_t* tmp_context;
+  uint64_t* child_context;
+
+  has_child = 0;
+  child_context = used_contexts;
+  address = *(get_regs(context) + REG_A0);
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+  if (is_valid_data_stack_heap_address(context, address) == 0) {
+    if (address != 0) {
+      *(get_regs(context) + REG_A0) = -1;
+      return -1;
+    }
+  }
+
+  while (child_context != (uint64_t*) 0) {
+    tmp_context = child_context;
+    child_context = get_next_context(tmp_context);
+    if (get_parent_process(tmp_context) == context) {
+      has_child = 1;
+      map_and_store(context, *(get_regs(context) + REG_A0), left_shift(sign_shrink(get_exit_code(tmp_context), 8), 8));
+      if (get_process_state(tmp_context) == STATUS_ZOMBIE) {
+        *(get_regs(context) + REG_A0) = get_process_id(tmp_context);
+        used_contexts = delete_context(tmp_context, used_contexts);
+        return get_process_id(tmp_context);
+      }
+    }
+  }
+
+  if (has_child) {
+    *(get_regs(context) + REG_A0) = 0;
+    set_process_state(context, STATUS_BLOCK);
+  } else {
+    *(get_regs(context) + REG_A0) = -1;
+    return -1;
+  }
+
+  return 0;
 }
 
 void emit_read() {
@@ -9146,6 +9282,8 @@ uint64_t* new_context() {
 
   used_contexts = context;
 
+  set_process_state(context, STATUS_READY);
+
   return context;
 }
 
@@ -9237,6 +9375,82 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from) {
   free_context(context);
 
   return from;
+}
+
+uint64_t* copy_context(uint64_t* original) {
+  uint64_t* context;
+  uint64_t count;
+  uint64_t i;
+  uint64_t r;
+
+  context = new_context();
+
+  set_regs(context, smalloc(NUMBEROFREGISTERS * WORDSIZE));
+
+  i = 0;
+  r = 0;
+
+  while (r < NUMBEROFREGISTERS) {
+    *(get_regs(context) + r) = *(get_regs(original) + r);
+
+    r = r + 1;
+  }
+
+  set_lowest_lo_page(context, get_page_of_virtual_address(get_code_seg_start(original)));
+  set_highest_lo_page(context, get_page_of_virtual_address(get_program_break(original) - WORDSIZE) + 1);
+  set_lowest_hi_page(context, get_page_of_virtual_address(*(get_regs(context) + REG_SP)));
+  set_highest_hi_page(context, NUMBEROFPAGES);
+  set_code_seg_start(context, get_code_seg_start(original));
+  set_data_seg_start(context, get_data_seg_start(original));
+  set_heap_seg_start(context, get_heap_seg_start(original));
+  set_program_break(context, get_program_break(original));
+  set_exception(context, get_exception(original));
+  set_fault(context, get_fault(original));
+  set_exit_code(context, get_exit_code(original));
+  set_parent_process(context, original);
+  set_virtual_context(context, get_virtual_context(original));
+  set_name(context, get_name(original));
+  set_parent(context, get_parent(original));
+  new_pid();
+  set_process_id(context, pid);
+
+  set_pt(context, zalloc((VIRTUALMEMORYSIZE / PAGESIZE) * WORDSIZE));
+
+  set_pc(original, get_pc(original) + INSTRUCTIONSIZE);
+  set_pc(context, get_pc(original));
+
+  *(get_regs(original) + REG_A0) = pid;
+  *(get_regs(context) + REG_A0) = 0;
+
+  count = get_lowest_lo_page(context);
+
+  while(count <= get_highest_lo_page(context)) {
+    i = 0;
+
+    while(i < PAGESIZE) {
+      if (is_virtual_address_mapped(get_pt(original), count * PAGESIZE + i))
+        map_and_store(context, count * PAGESIZE + i, load_virtual_memory(get_pt(original), count * PAGESIZE + i));
+
+      i = i + WORDSIZE;
+    }
+
+    count = count + 1;
+  }
+  count = get_lowest_hi_page(context);
+
+  while(count <= get_highest_hi_page(context)) {
+    i = 0;
+
+    while(i < PAGESIZE) {
+      if (is_virtual_address_mapped(get_pt(original), count * PAGESIZE + i))
+        map_and_store(context, count * PAGESIZE + i, load_virtual_memory(get_pt(original), count * PAGESIZE + i));
+
+      i = i + WORDSIZE;
+    }
+
+    count = count + 1;
+  }
+  return context;
 }
 
 // -----------------------------------------------------------------
@@ -9727,6 +9941,28 @@ void up_load_arguments(uint64_t* context, uint64_t argc, uint64_t* argv) {
   *(get_regs(context) + REG_S0) = 0;
 }
 
+uint64_t check_exit(uint64_t* context) {
+  uint64_t exit_code;
+
+  if (get_parent_process(context) == MY_CONTEXT) {
+    used_contexts = (uint64_t*) 0;
+    return EXIT;
+  }
+
+  if (get_process_state(get_parent_process(context)) == STATUS_BLOCK) {
+    set_process_state(get_parent_process(context), STATUS_READY);
+  } else {
+    set_process_state(context, STATUS_ZOMBIE);
+  }
+
+  exit_code = sign_shrink(get_exit_code(context), 8);
+  exit_code = left_shift(exit_code, 8);
+  if (is_valid_virtual_address(*(get_regs(get_parent_process(context)) + REG_A0)))
+    map_and_store(get_parent_process(context), *(get_regs(get_parent_process(context)) + REG_A0), exit_code);
+
+  return DONOTEXIT;
+}
+
 uint64_t handle_system_call(uint64_t* context) {
   uint64_t a7;
 
@@ -9745,11 +9981,14 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
+  else if (a7 == SYSCALL_FORK)
+    implement_fork(context);
+  else if (a7 == SYSCALL_WAIT)
+    implement_wait(context);
   else if (a7 == SYSCALL_EXIT) {
     implement_exit(context);
 
-    // TODO: exit only if all contexts have exited
-    return EXIT;
+    return check_exit(context);
   } else {
     printf2("%s: unknown system call %u\n", selfie_name, (char*) a7);
 
@@ -9828,6 +10067,7 @@ uint64_t handle_exception(uint64_t* context) {
 uint64_t mipster(uint64_t* to_context) {
   uint64_t timeout;
   uint64_t* from_context;
+  uint64_t* context;
 
   print("mipster\n");
   printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
@@ -9845,10 +10085,55 @@ uint64_t mipster(uint64_t* to_context) {
     } else if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else {
-      // TODO: scheduler should go here
-      to_context = from_context;
-
+      if (get_next_context(from_context) != (uint64_t*) 0)
+        to_context = get_next_context(from_context);
+      else {
+        context = used_contexts;
+        while (context != (uint64_t*) 0) {
+          if (get_process_state(context) == STATUS_READY) {
+            if (get_virtual_context(context) == (uint64_t*) 0) {
+              to_context = context;
+              context = (uint64_t*) 0;
+            }
+          }
+          if (context != (uint64_t*) 0)
+            context = get_next_context(context);
+        }
+      }
       timeout = TIMESLICE;
+    }
+  }
+}
+
+uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count) {
+  uint64_t timeout;
+  uint64_t* from_context;
+
+  print("mipster\n");
+  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
+
+  timeout = CONCURRENT_TIMESLICE;
+
+  while (1) {
+    from_context = mipster_switch(to_context, timeout);
+
+    if (get_parent(from_context) != MY_CONTEXT) {
+      to_context = get_parent(from_context);
+
+      timeout = TIMEROFF;
+    } else if (handle_exception(from_context) == EXIT) {
+      context_count = context_count - 1;
+      to_context = delete_context(from_context, used_contexts);
+      timeout = CONCURRENT_TIMESLICE;
+      if (context_count < 1)
+        return get_exit_code(from_context);
+    } else {
+      if (get_next_context(from_context) != (uint64_t*) 0)
+        to_context = get_next_context(from_context);
+      else
+        to_context = used_contexts;
+
+      timeout = CONCURRENT_TIMESLICE;
     }
   }
 }
@@ -9865,8 +10150,34 @@ uint64_t hypster(uint64_t* to_context) {
     if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else
-      // TODO: scheduler should go here
-      to_context = from_context;
+      if (get_next_context(from_context) != (uint64_t*) 0)
+        to_context = get_next_context(from_context);
+      else
+        to_context = used_contexts;
+  }
+}
+
+uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count) {
+  uint64_t* from_context;
+
+  print("hypster\n");
+  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
+
+  while (1) {
+    from_context = hypster_switch(to_context, CONCURRENT_TIMESLICE + 1);
+
+    if (handle_exception(from_context) == EXIT){
+      context_count = context_count - 1;
+      to_context = delete_context(from_context, used_contexts);
+      if (context_count < 1)
+        return get_exit_code(from_context);
+    }
+    else {
+      if (get_next_context(from_context) != (uint64_t*) 0)
+        to_context = get_next_context(from_context);
+      else
+        to_context = used_contexts;
+    }
   }
 }
 
@@ -10058,8 +10369,10 @@ void boot_loader(uint64_t* context) {
   up_load_arguments(context, number_of_remaining_arguments(), remaining_arguments());
 }
 
-uint64_t selfie_run(uint64_t machine) {
+uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   uint64_t exit_code;
+  uint64_t number_of_contexts;
+  number_of_contexts = context_numbers;
 
   if (binary_length == 0) {
     printf1("%s: nothing to run, debug, or host\n", selfie_name);
@@ -10074,8 +10387,14 @@ uint64_t selfie_run(uint64_t machine) {
   init_memory(atoi(peek_argument(0)));
 
   current_context = create_context(MY_CONTEXT, 0);
+  new_pid();
 
   // assert: number_of_remaining_arguments() > 0
+
+  while(number_of_contexts > 1){
+    boot_loader(create_context(MY_CONTEXT, 0));
+    number_of_contexts = number_of_contexts - 1;
+  }
 
   boot_loader(current_context);
 
@@ -10109,7 +10428,12 @@ uint64_t selfie_run(uint64_t machine) {
 
   run = 1;
 
-  if (machine == MIPSTER)
+  if (machine == MIPSTER) {
+    if (context_numbers > 1)
+      exit_code = mipster_concurrently(current_context, context_numbers);
+    else
+      exit_code = mipster(current_context);
+  } else if (machine == DIPSTER)
     exit_code = mipster(current_context);
   else if (machine == DIPSTER)
     exit_code = mipster(current_context);
@@ -10121,7 +10445,12 @@ uint64_t selfie_run(uint64_t machine) {
     exit_code = mobster(current_context);
   else if (machine == HYPSTER)
     exit_code = hypster(current_context);
-  else
+  else if (machine == HYPSTER) {
+    if (context_numbers > 1)
+      exit_code = hypster_concurrently(current_context, context_numbers);
+    else
+      exit_code = hypster(current_context);
+  } else
     // change 0 to anywhere between 0% to 100% mipster
     exit_code = mixter(current_context, 0);
 
@@ -10225,17 +10554,21 @@ uint64_t selfie(uint64_t extras) {
         selfie_load();
       else if (extras == 0) {
         if (string_compare(argument, "-m"))
-          return selfie_run(MIPSTER);
+          return selfie_run(MIPSTER, 1);
         else if (string_compare(argument, "-d"))
-          return selfie_run(DIPSTER);
+          return selfie_run(DIPSTER, 1);
         else if (string_compare(argument, "-r"))
-          return selfie_run(RIPSTER);
+          return selfie_run(RIPSTER, 1);
         else if (string_compare(argument, "-y"))
-          return selfie_run(HYPSTER);
+          return selfie_run(HYPSTER, 1);
         else if (string_compare(argument, "-min"))
-          return selfie_run(MINSTER);
+          return selfie_run(MINSTER, 1);
         else if (string_compare(argument, "-mob"))
-          return selfie_run(MOBSTER);
+          return selfie_run(MOBSTER, 1);
+        else if (string_compare(argument, "-x"))
+          return selfie_run(MIPSTER, atoi(peek_argument(0)));
+        else if (string_compare(argument, "-z"))
+          return selfie_run(HYPSTER, atoi(peek_argument(0)));
         else
           return EXITCODE_BADARGUMENTS;
       } else
