@@ -107,6 +107,25 @@ uint64_t STATUS_READY   = 0;
 uint64_t STATUS_BLOCK   = 1;
 uint64_t STATUS_ZOMBIE  = 2;
 
+// -------------------------- ASSIGNMENT 7 -------------------------
+
+void emit_pthread_create();
+void implement_pthread_create(uint64_t* context);
+
+void emit_pthread_join();
+void implement_pthread_join(uint64_t* context);
+
+void emit_pthread_exit();
+void implement_pthread_exit(uint64_t* context);
+
+void emit_lock();
+void implement_lock(uint64_t* context);
+
+uint64_t SYSCALL_LOCK   = 407;
+uint64_t SYSCALL_PTHREAD_CREATE = 409;
+uint64_t SYSCALL_PTHREAD_JOIN   = 410;
+uint64_t SYSCALL_PTHREAD_EXIT   = 411;
+
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
@@ -5311,6 +5330,12 @@ void selfie_compile() {
 
   emit_switch();
 
+  emit_pthread_create();
+  emit_pthread_join();
+  emit_pthread_exit();
+
+  emit_lock();
+
   if (GC_ON) {
     emit_fetch_stack_pointer();
     emit_fetch_global_pointer();
@@ -6405,6 +6430,71 @@ void implement_exit(uint64_t* context) {
   printf3("%s: %s exiting with exit code %d\n", selfie_name,
           get_name(context),
           (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
+}
+
+void emit_lock()
+{
+  create_symbol_table_entry(LIBRARY_TABLE, "lock", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_LOCK);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_lock(uint64_t *context)
+{
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+
+}
+
+void emit_pthread_create() {
+  create_symbol_table_entry(LIBRARY_TABLE, "pthread_create", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_PTHREAD_CREATE);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_pthread_create(uint64_t* context) {
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+void emit_pthread_join() {
+  create_symbol_table_entry(LIBRARY_TABLE, "pthread_join", 0, PROCEDURE, UINT64_T, 0, binary_length);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_PTHREAD_JOIN);
+
+  emit_ld(REG_A0, REG_SP, 0);
+
+  emit_addi(REG_SP, REG_SP, 8);
+
+  emit_ecall();
+
+  emit_jalr(REG_ZR, REG_RA, 0);
+}
+
+void implement_pthread_join(uint64_t* context) {
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
+}
+
+void emit_pthread_exit() {
+  create_symbol_table_entry(LIBRARY_TABLE, "pthread_exit", 0, PROCEDURE, VOID_T, 0, binary_length);
+
+  emit_ld(REG_A0, REG_SP, 0);
+
+  emit_addi(REG_SP, REG_SP, 8);
+
+  emit_addi(REG_A7, REG_ZR, SYSCALL_PTHREAD_EXIT);
+
+  emit_ecall();
+}
+
+void implement_pthread_exit(uint64_t* context) {
+  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
 }
 
 void emit_fork() {
@@ -9981,6 +10071,14 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
+  else if (a7 == SYSCALL_PTHREAD_CREATE)
+    implement_pthread_create(context);
+  else if (a7 == SYSCALL_PTHREAD_JOIN)
+    implement_pthread_join(context);
+  else if (a7 == SYSCALL_PTHREAD_EXIT)
+    implement_pthread_exit(context);
+  else if (a7 == SYSCALL_LOCK)
+    implement_lock(context);
   else if (a7 == SYSCALL_FORK)
     implement_fork(context);
   else if (a7 == SYSCALL_WAIT)
@@ -10150,10 +10248,10 @@ uint64_t hypster(uint64_t* to_context) {
     if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else
-      if (get_next_context(from_context) != (uint64_t*) 0)
-        to_context = get_next_context(from_context);
-      else
-        to_context = used_contexts;
+    if (get_next_context(from_context) != (uint64_t*) 0)
+      to_context = get_next_context(from_context);
+    else
+      to_context = used_contexts;
   }
 }
 
