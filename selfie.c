@@ -81,67 +81,6 @@ is inspired by the conservative garbage collector of Hans Boehm.
 
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
 // -----------------------------------------------------------------
-// -----------------     A S S I G N M E N T S     -----------------
-// -----------------------------------------------------------------
-// *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
-
-// -------------------------- ASSIGNMENT 0 -------------------------
-
-void print_my_name();
-
-// -------------------------- ASSIGNMENT 1 -------------------------
-
-uint64_t is_character_hexadecimal();
-uint64_t value_of_hexadecimal(uint64_t c);
-uint64_t MAX_HEX_INTEGER_LENGTH = 16;
-uint64_t is_assembly_command();
-void selfie_compile_as_assembly();
-void assembly_compile();
-
-// -------------------------- ASSIGNMENT 2 -------------------------
-
-uint64_t get_register();
-
-// -------------------------- ASSIGNMENT 3 -------------------------
-
-uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count);
-uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count);
-uint64_t CONCURRENT_TIMESLICE = 1;
-
-// -------------------------- ASSIGNMENT 4 -------------------------
-
-void emit_fork();
-void implement_fork(uint64_t* original_context);
-
-void emit_wait();
-uint64_t implement_wait(uint64_t* context);
-
-uint64_t SYSCALL_FORK   = 225;
-uint64_t SYSCALL_WAIT   = 226;
-
-uint64_t pid = 1;
-void new_pid() { pid = pid + 1; }
-uint64_t* copy_context(uint64_t* original);
-
-// -------------------------- ASSIGNMENT 5 -------------------------
-
-uint64_t check_exit(uint64_t* context);
-uint64_t STATUS_READY   = 0;
-uint64_t STATUS_BLOCK   = 1;
-uint64_t STATUS_ZOMBIE  = 2;
-
-// -------------------------- ASSIGNMENT 6 -------------------------
-
-uint64_t SYSCALL_LOCK   = 227;
-uint64_t SYSCALL_UNLOCK = 228;
-
-void emit_lock();
-void implement_lock(uint64_t *context);
-void emit_unlock();
-void implement_unlock(uint64_t *context);
-
-// *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
-// -----------------------------------------------------------------
 // ---------------------     L I B R A R Y     ---------------------
 // -----------------------------------------------------------------
 // *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~ *~*~
@@ -287,7 +226,6 @@ uint64_t CHAR_EXCLAMATION  = '!';
 uint64_t CHAR_LT           = '<';
 uint64_t CHAR_GT           = '>';
 uint64_t CHAR_BACKSLASH    =  92; // ASCII code 92 = backslash
-uint64_t CHAR_DOT          = '.';
 
 uint64_t* character_buffer; // buffer for reading and writing characters
 
@@ -459,27 +397,6 @@ uint64_t SYM_INT      = 28; // int
 uint64_t SYM_CHAR     = 29; // char
 uint64_t SYM_UNSIGNED = 30; // unsigned
 
-uint64_t SYM_DOT = 31;
-
-// symbols for assembly assignment-1
-
-uint64_t SYM_LUI      = 32; // lui
-uint64_t SYM_ADDI     = 33; // addi
-uint64_t SYM_LD       = 34; // ld
-uint64_t SYM_SD       = 35; // sd
-uint64_t SYM_ADD      = 36; // add
-uint64_t SYM_SUB      = 37; // sub
-uint64_t SYM_MUL      = 38; // mul
-uint64_t SYM_DIVU     = 39; // divu
-uint64_t SYM_REMU     = 40; // remu
-uint64_t SYM_SLTU     = 41; // sltu
-uint64_t SYM_BEQ      = 42; // beq
-uint64_t SYM_JAL      = 43; // jal
-uint64_t SYM_JALR     = 44; // jalr
-uint64_t SYM_ECALL    = 45; // ecall
-uint64_t SYM_QUAD     = 46; // quad
-uint64_t SYM_NOP      = 47; // nop
-
 uint64_t* SYMBOLS; // strings representing symbols
 
 uint64_t MAX_IDENTIFIER_LENGTH = 64;  // maximum number of characters in an identifier
@@ -514,7 +431,7 @@ uint64_t source_fd   = 0; // file descriptor of open source file
 // ------------------------- INITIALIZATION ------------------------
 
 void init_scanner () {
-  SYMBOLS = smalloc((SYM_NOP + 1) * SIZEOFUINT64STAR);
+  SYMBOLS = smalloc((SYM_UNSIGNED + 1) * SIZEOFUINT64STAR);
 
   *(SYMBOLS + SYM_INTEGER)      = (uint64_t) "integer";
   *(SYMBOLS + SYM_CHARACTER)    = (uint64_t) "character";
@@ -548,23 +465,6 @@ void init_scanner () {
   *(SYMBOLS + SYM_INT)      = (uint64_t) "int";
   *(SYMBOLS + SYM_CHAR)     = (uint64_t) "char";
   *(SYMBOLS + SYM_UNSIGNED) = (uint64_t) "unsigned";
-
-  *(SYMBOLS + SYM_LUI)   = (uint64_t) "lui";
-  *(SYMBOLS + SYM_ADDI)  = (uint64_t) "addi";
-  *(SYMBOLS + SYM_LD)    = (uint64_t) "ld";
-  *(SYMBOLS + SYM_SD)    = (uint64_t) "sd";
-  *(SYMBOLS + SYM_ADD)   = (uint64_t) "add";
-  *(SYMBOLS + SYM_SUB)   = (uint64_t) "sub";
-  *(SYMBOLS + SYM_MUL)   = (uint64_t) "mul";
-  *(SYMBOLS + SYM_DIVU)  = (uint64_t) "divu";
-  *(SYMBOLS + SYM_REMU)  = (uint64_t) "remu";
-  *(SYMBOLS + SYM_SLTU)  = (uint64_t) "sltu";
-  *(SYMBOLS + SYM_BEQ)   = (uint64_t) "beq";
-  *(SYMBOLS + SYM_JAL)   = (uint64_t) "jal";
-  *(SYMBOLS + SYM_JALR)  = (uint64_t) "jalr";
-  *(SYMBOLS + SYM_ECALL) = (uint64_t) "ecall";
-  *(SYMBOLS + SYM_QUAD)  = (uint64_t) "quad";
-  *(SYMBOLS + SYM_NOP)   = (uint64_t) "nop";
 
   character = CHAR_EOF;
   symbol    = SYM_EOF;
@@ -1792,16 +1692,12 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from);
 // | 20 | free-list head  | pointer to head of free list
 // | 21 | gcs counter     | number of gc runs in gc period
 // | 22 | gc enabled      | flag indicating whether to use gc or not
-// | 23 | process ID      |
-// | 24 | parent process  |
-// | 25 | children        |
-// | 26 | process state   |
 // +----+-----------------+
 
 // CAUTION: contexts are extended in the symbolic execution engine!
 
 uint64_t* allocate_context() {
-  return smalloc(11 * SIZEOFUINT64STAR + 16 * SIZEOFUINT64);
+  return smalloc(9 * SIZEOFUINT64STAR + 14 * SIZEOFUINT64);
 }
 
 uint64_t next_context(uint64_t* context)    { return (uint64_t) context; }
@@ -1829,11 +1725,6 @@ uint64_t free_list_head(uint64_t* context)   { return (uint64_t) (context + 20);
 uint64_t gcs_in_period(uint64_t* context)    { return (uint64_t) (context + 21); }
 uint64_t use_gc_kernel(uint64_t* context)    { return (uint64_t) (context + 22); }
 
-uint64_t process_id(uint64_t* context)      { return (uint64_t) (context + 23); }
-uint64_t parent_process(uint64_t* context)  { return (uint64_t) (context + 24); }
-uint64_t children(uint64_t* context)        { return (uint64_t) (context + 25); }
-uint64_t process_state(uint64_t* context)   { return (uint64_t) (context + 26); }
-
 uint64_t* get_next_context(uint64_t* context)    { return (uint64_t*) *context; }
 uint64_t* get_prev_context(uint64_t* context)    { return (uint64_t*) *(context + 1); }
 uint64_t  get_pc(uint64_t* context)              { return             *(context + 2); }
@@ -1859,11 +1750,6 @@ uint64_t* get_free_list_head(uint64_t* context)   { return (uint64_t*) *(context
 uint64_t  get_gcs_in_period(uint64_t* context)    { return             *(context + 21); }
 uint64_t  get_use_gc_kernel(uint64_t* context)    { return             *(context + 22); }
 
-uint64_t  get_process_id(uint64_t* context)      { return             *(context + 23); }
-uint64_t* get_parent_process(uint64_t* context)  { return (uint64_t*) *(context + 24); }
-uint64_t* get_children(uint64_t* context)        { return (uint64_t*) *(context + 25); }
-uint64_t  get_process_state(uint64_t* context)   { return             *(context + 26); }
-
 void set_next_context(uint64_t* context, uint64_t* next)      { *context        = (uint64_t) next; }
 void set_prev_context(uint64_t* context, uint64_t* prev)      { *(context + 1)  = (uint64_t) prev; }
 void set_pc(uint64_t* context, uint64_t pc)                   { *(context + 2)  = pc; }
@@ -1888,11 +1774,6 @@ void set_used_list_head(uint64_t* context, uint64_t* used_list_head) { *(context
 void set_free_list_head(uint64_t* context, uint64_t* free_list_head) { *(context + 20) = (uint64_t) free_list_head; }
 void set_gcs_in_period(uint64_t* context, uint64_t gcs)              { *(context + 21) = gcs; }
 void set_use_gc_kernel(uint64_t* context, uint64_t use)              { *(context + 22) = use; }
-
-void set_process_id(uint64_t* context, uint64_t parent_process)         { *(context + 23) = parent_process; }
-void set_parent_process(uint64_t* context, uint64_t* parent_process)    { *(context + 24) = (uint64_t) parent_process; }
-void set_children(uint64_t* context, uint64_t* children)                { *(context + 25) = (uint64_t) children; }
-void set_process_state(uint64_t* context, uint64_t state)               { *(context + 26) = state; }
 
 // -----------------------------------------------------------------
 // -------------------------- MICROKERNEL --------------------------
@@ -1980,7 +1861,7 @@ char* replace_extension(char* filename, char* extension);
 
 void boot_loader(uint64_t* context);
 
-uint64_t selfie_run(uint64_t machine, uint64_t context_numbers);
+uint64_t selfie_run(uint64_t machine);
 
 // ------------------------ GLOBAL CONSTANTS -----------------------
 
@@ -2341,26 +2222,6 @@ uint64_t string_compare(char* s, char* t) {
       return 0;
 }
 
-uint64_t value_of_hexadecimal(uint64_t c) {
-  // ASCII codes for lower- and uppercase letters are in contiguous intervals
-  if (c >= 'a')
-    if (c <= 'f')
-      return c - 67; // 10 - 'a' = 67
-
-  if (c >= 'A')
-    if (c <= 'F')
-      return c - 55; // 10 - 'A' = 55
-
-  // ASCII codes for digits are in a contiguous interval
-  if (c >= '0')
-    if (c <= '9')
-      return c - '0';
-
-  printf2("%s: cannot convert non-hexadecimal number %d\n", selfie_name, (char*) c);
-  exit(EXITCODE_BADARGUMENTS);
-  return c;
-}
-
 uint64_t atoi(char* s) {
   uint64_t i;
   uint64_t n;
@@ -2376,37 +2237,6 @@ uint64_t atoi(char* s) {
   // load character (one byte) at index i in s from memory requires
   // bit shifting since memory access can only be done in double words
   c = load_character(s, i);
-
-  // assignment-1
-  // s starts with x if s is a hexadecimal
-  if (c == 'x') {
-    // go to the next digit
-    i = i + 1;
-    c = load_character(s, i);
-
-    while (c != 0) {
-      if (i - 1 >= MAX_HEX_INTEGER_LENGTH) { // i - 1 because i starts with 1
-        // 1 character in hexadecimal needs 4 bits. 4*16=64 /  16 times F  \
-        // s contains a hexadecimal number  larger  than  0xFFFFFFFFFFFFFFFF
-        printf2("%s: cannot convert out-of-bound hexadecimal number 0%s\n", selfie_name, s);
-
-        exit(EXITCODE_BADARGUMENTS);
-      }
-
-      c = value_of_hexadecimal(c);
-      n = n * 16 + c;
-
-      // go to the next digit
-      i = i + 1;
-
-      // load character (one byte) at index i in s from memory requires
-      // bit shifting since memory access can only be done in double words
-      c = load_character(s, i);
-
-    }
-
-    return n;
-  }
 
   // loop until s is terminated
   while (c != 0) {
@@ -3174,22 +3004,6 @@ uint64_t is_character_digit() {
     return 0;
 }
 
-uint64_t is_character_hexadecimal() {
-  // ASCII codes for lower- and uppercase letters and digits are in contiguous intervals
-  if (character >= 'a')
-    if (character <= 'f')
-      return 1;
-    else
-      return 0;
-  else if (character >= 'A')
-    if (character <= 'F')
-      return 1;
-    else
-      return 0;
-  else
-    return is_character_digit();
-}
-
 uint64_t is_character_letter_or_digit_or_underscore() {
   if (is_character_letter())
     return 1;
@@ -3238,38 +3052,6 @@ uint64_t identifier_or_keyword() {
   else if (identifier_string_match(SYM_UNSIGNED))
     // selfie bootstraps unsigned to uint64_t!
     return SYM_UINT64;
-  else if (identifier_string_match(SYM_LUI))
-    return SYM_LUI;
-  else if (identifier_string_match(SYM_ADDI))
-    return SYM_ADDI;
-  else if (identifier_string_match(SYM_LD))
-    return SYM_LD;
-  else if (identifier_string_match(SYM_SD))
-    return SYM_SD;
-  else if (identifier_string_match(SYM_ADD))
-    return SYM_ADD;
-  else if (identifier_string_match(SYM_SUB))
-    return SYM_SUB;
-  else if (identifier_string_match(SYM_MUL))
-    return SYM_MUL;
-  else if (identifier_string_match(SYM_DIVU))
-    return SYM_DIVU;
-  else if (identifier_string_match(SYM_REMU))
-    return SYM_REMU;
-  else if (identifier_string_match(SYM_SLTU))
-    return SYM_SLTU;
-  else if (identifier_string_match(SYM_BEQ))
-    return SYM_BEQ;
-  else if (identifier_string_match(SYM_JAL))
-    return SYM_JAL;
-  else if (identifier_string_match(SYM_JALR))
-    return SYM_JALR;
-  else if (identifier_string_match(SYM_ECALL))
-    return SYM_ECALL;
-  else if (identifier_string_match(SYM_QUAD))
-    return SYM_QUAD;
-  else if (identifier_string_match(SYM_NOP))
-    return SYM_NOP;
   else
     return SYM_IDENTIFIER;
 }
@@ -3329,34 +3111,6 @@ void get_symbol() {
           i = i + 1;
 
           get_character();
-        }
-
-        // assignment-1
-        // hexadecimal numbers prefixed with 0x
-        // if the symbol is a hexadecimal
-        if (i == 1) {
-          if (character == 'x') {
-            if (load_character(integer, 0) == '0') {
-              store_character(integer, 0, character);
-              get_character();
-
-              while (is_character_hexadecimal()) {
-                if (i - 1 >= MAX_HEX_INTEGER_LENGTH) { // i - 1 because i starts with 1
-                  if (integer_is_signed)
-                    syntax_error_message("signed integer out of bound");
-                  else
-                    syntax_error_message("integer out of bound");
-                  exit(EXITCODE_SCANNERERROR);
-                }
-
-                store_character(integer, i, character);
-
-                i = i + 1;
-
-                get_character();
-              }
-            }
-          }
         }
 
         store_character(integer, i, 0); // null-terminated string
@@ -3525,11 +3279,6 @@ void get_symbol() {
           symbol = SYM_GEQ;
         } else
           symbol = SYM_GT;
-
-      } else if (character == CHAR_DOT) {
-        get_character();
-
-        symbol = SYM_DOT;
 
       } else {
         print_line_number("syntax error", line_number);
@@ -3784,43 +3533,6 @@ uint64_t is_comparison() {
   else if (symbol == SYM_LEQ)
     return 1;
   else if (symbol == SYM_GEQ)
-    return 1;
-  else
-    return 0;
-}
-
-uint64_t is_assembly_command() {
-  if (symbol == SYM_LUI)
-    return 1;
-  else if (symbol == SYM_ADDI)
-    return 1;
-  else if (symbol == SYM_LD)
-    return 1;
-  else if (symbol == SYM_SD)
-    return 1;
-  else if (symbol == SYM_ADD)
-    return 1;
-  else if (symbol == SYM_SUB)
-    return 1;
-  else if (symbol == SYM_MUL)
-    return 1;
-  else if (symbol == SYM_DIVU)
-    return 1;
-  else if (symbol == SYM_REMU)
-    return 1;
-  else if (symbol == SYM_SLTU)
-    return 1;
-  else if (symbol == SYM_BEQ)
-    return 1;
-  else if (symbol == SYM_JAL)
-    return 1;
-  else if (symbol == SYM_JALR)
-    return 1;
-  else if (symbol == SYM_ECALL)
-    return 1;
-  else if (symbol == SYM_QUAD)
-    return 1;
-  else if (symbol == SYM_DOT)
     return 1;
   else
     return 0;
@@ -5263,334 +4975,6 @@ void compile_procedure(char* procedure, uint64_t type) {
   // assert: allocated_temporaries == 0
 }
 
-uint64_t get_register() {
-  if (string_compare(identifier, "zero"))
-    return REG_ZR;
-  else if (string_compare(identifier, "ra"))
-    return REG_RA;
-  else if (string_compare(identifier, "sp"))
-    return REG_SP;
-  else if (string_compare(identifier, "gp"))
-    return REG_GP;
-  else if (string_compare(identifier, "tp"))
-    return REG_TP;
-  else if (string_compare(identifier, "t0"))
-    return REG_T0;
-  else if (string_compare(identifier, "t1"))
-    return REG_T1;
-  else if (string_compare(identifier, "t2"))
-    return REG_T2;
-  else if (string_compare(identifier, "s0"))
-    return REG_S0;
-  else if (string_compare(identifier, "s1"))
-    return REG_S1;
-  else if (string_compare(identifier, "a0"))
-    return REG_A0;
-  else if (string_compare(identifier, "a1"))
-    return REG_A1;
-  else if (string_compare(identifier, "a2"))
-    return REG_A2;
-  else if (string_compare(identifier, "a3"))
-    return REG_A3;
-  else if (string_compare(identifier, "a4"))
-    return REG_A4;
-  else if (string_compare(identifier, "a5"))
-    return REG_A5;
-  else if (string_compare(identifier, "a6"))
-    return REG_A6;
-  else if (string_compare(identifier, "a7"))
-    return REG_A7;
-  else if (string_compare(identifier, "s2"))
-    return REG_S2;
-  else if (string_compare(identifier, "s3"))
-    return REG_S3;
-  else if (string_compare(identifier, "s4"))
-    return REG_S4;
-  else if (string_compare(identifier, "s5"))
-    return REG_S5;
-  else if (string_compare(identifier, "s6"))
-    return REG_S6;
-  else if (string_compare(identifier, "s7"))
-    return REG_S7;
-  else if (string_compare(identifier, "s8"))
-    return REG_S8;
-  else if (string_compare(identifier, "s9"))
-    return REG_S9;
-  else if (string_compare(identifier, "s10"))
-    return REG_S10;
-  else if (string_compare(identifier, "s11"))
-    return REG_S11;
-  else if (string_compare(identifier, "t3"))
-    return REG_T3;
-  else if (string_compare(identifier, "t4"))
-    return REG_T4;
-  else if (string_compare(identifier, "t5"))
-    return REG_T5;
-  else if (string_compare(identifier, "t6"))
-    return REG_T6;
-  exit(EXITCODE_PARSERERROR);
-  return -1;
-}
-
-void assembly_compile() {
-  uint64_t a;
-  uint64_t b;
-  uint64_t c;
-  uint64_t mult;
-  mult = 1;
-
-  while (symbol != SYM_EOF) {
-    if (symbol == SYM_LUI) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = sign_extend(literal, 20);
-      get_symbol(); // imm
-      emit_lui(a, c);
-    } else if (symbol == SYM_ADDI) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      emit_addi(a,b,c);
-      get_symbol(); // imm
-    } else if (symbol == SYM_LD) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      get_symbol(); // imm
-      get_symbol(); // (
-      b = get_register();
-      get_symbol(); // rs1
-      get_symbol(); // )
-      emit_ld(a,b,c);
-    } else if (symbol == SYM_SD) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rs2
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      get_symbol(); // imm
-      get_symbol(); // (
-      b = get_register();
-      get_symbol(); // rs1
-      get_symbol(); // )
-      emit_sd(a,c,b);
-    } else if (symbol == SYM_ADD) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = get_register();
-      get_symbol(); // rs2
-      emit_add(a,b,c);
-    } else if (symbol == SYM_SUB) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = get_register();
-      get_symbol(); // rs2
-      emit_sub(a,b,c);
-    } else if (symbol == SYM_MUL) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = get_register();
-      get_symbol(); // rs2
-      emit_mul(a,b,c);
-    } else if (symbol == SYM_DIVU) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = get_register();
-      get_symbol(); // rs2
-      emit_divu(a,b,c);
-    } else if (symbol == SYM_REMU) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = get_register();
-      get_symbol(); // rs2
-      emit_remu(a,b,c);
-    } else if (symbol == SYM_SLTU) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      c = get_register();
-      get_symbol(); // rs2
-      emit_sltu(a,b,c);
-    } else if (symbol == SYM_BEQ) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rs1
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      b = get_register();
-      get_symbol(); // rs2
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      get_symbol(); // imm
-      emit_beq(a,b,c * INSTRUCTIONSIZE);
-    } else if (symbol == SYM_JAL) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      get_symbol(); // imm
-      emit_jal(a,c * INSTRUCTIONSIZE);
-    } else if (symbol == SYM_JALR) {
-      get_symbol();
-      a = get_register();
-      get_symbol(); // rd
-      if (symbol == SYM_COMMA)
-        get_symbol(); // ,
-      else
-        syntax_error_symbol(SYM_COMMA);
-      if (symbol == SYM_MINUS) {
-        mult = -1;
-        get_symbol(); // -
-      }
-      c = mult * literal;
-      get_symbol(); // imm
-      get_symbol(); // (
-      b = get_register();
-      get_symbol(); // rs1
-      get_symbol(); // )
-      emit_jalr(a,b,c * INSTRUCTIONSIZE);
-    } else if (symbol == SYM_ECALL) {
-      get_symbol();
-      emit_ecall();
-    }  else if (symbol == SYM_NOP) {
-      get_symbol();
-      emit_nop();
-    } else if (symbol == SYM_DOT) {
-      get_symbol();
-      if (symbol == SYM_QUAD) {
-        get_symbol();
-        get_symbol();
-      } else
-        syntax_error_symbol(SYM_QUAD);
-    } else {
-      syntax_error_unexpected();
-      get_symbol();
-    }
-  }
-}
-
 void compile_cstar() {
   uint64_t type;
   char* variable_or_procedure_name;
@@ -5873,10 +5257,6 @@ void selfie_compile() {
   emit_read();
   emit_write();
   emit_open();
-  emit_lock();
-  emit_unlock();
-  emit_fork();
-  emit_wait();
 
   emit_malloc();
 
@@ -5969,109 +5349,6 @@ void selfie_compile() {
           (char*) binary_length,
           (char*) (code_length / INSTRUCTIONSIZE),
           (char*) (binary_length - code_length));
-
-  print_instruction_counters();
-}
-
-void selfie_compile_as_assembly() {
-  uint64_t link;
-  uint64_t number_of_source_files;
-  uint64_t fetch_dss_code_location;
-
-  fetch_dss_code_location = 0;
-
-  // link until next console option
-  link = 1;
-
-  number_of_source_files = 0;
-
-  source_name = "library";
-
-  binary_name = source_name;
-
-  // allocate memory for storing binary
-  binary        = zmalloc(MAX_BINARY_LENGTH);
-  binary_length = 0;
-
-  // reset code length
-  code_length = 0;
-
-  // allocate zeroed memory for storing source code line numbers
-  code_line_number = zmalloc(MAX_CODE_LENGTH / INSTRUCTIONSIZE * SIZEOFUINT64);
-  data_line_number = zmalloc(MAX_DATA_LENGTH / WORDSIZE * SIZEOFUINT64);
-
-  reset_symbol_tables();
-  reset_instruction_counters();
-
-  emit_program_entry();
-
-  // emit system call wrappers
-  // exit code must be first
-  emit_exit();
-  emit_read();
-  emit_write();
-  emit_open();
-
-  emit_malloc();
-
-  emit_switch();
-
-  if (GC_ON) {
-    emit_fetch_stack_pointer();
-    emit_fetch_global_pointer();
-
-    // save code location of eventual fetch_data_segment_size implementation
-    fetch_dss_code_location = binary_length;
-
-    emit_fetch_data_segment_size_interface();
-  }
-
-  // implicitly declare main procedure in global symbol table
-  // copy "main" string into zeroed double word to obtain unique hash
-  create_symbol_table_entry(GLOBAL_TABLE, string_copy("main"), 0, PROCEDURE, UINT64_T, 0, 0);
-
-  while (link) {
-    if (number_of_remaining_arguments() == 0)
-      link = 0;
-    else if (load_character(peek_argument(0), 0) == '-')
-      link = 0;
-    else {
-      source_name = get_argument();
-
-      number_of_source_files = number_of_source_files + 1;
-
-      printf2("%s: selfie compiling %s with starc\n", selfie_name, source_name);
-
-      // assert: source_name is mapped and not longer than MAX_FILENAME_LENGTH
-
-      source_fd = sign_extend(open(source_name, O_RDONLY, 0), SYSCALL_BITWIDTH);
-
-      if (signed_less_than(source_fd, 0)) {
-        printf2("%s: could not open input file %s\n", selfie_name, source_name);
-
-        exit(EXITCODE_IOERROR);
-      }
-
-      reset_scanner();
-      reset_parser();
-
-      assembly_compile();
-    }
-  }
-
-  if (number_of_source_files == 0)
-    printf1("%s: nothing to compile, only library generated\n", selfie_name);
-
-  emit_bootstrapping();
-
-  if (GC_ON)
-    emit_fetch_data_segment_size_implementation(fetch_dss_code_location);
-
-  emit_data_segment();
-
-  ELF_header = create_elf_header(binary_length, code_length);
-
-  entry_point = ELF_ENTRY_POINT;
 
   print_instruction_counters();
 }
@@ -7079,114 +6356,6 @@ void implement_exit(uint64_t* context) {
   printf3("%s: %s exiting with exit code %d\n", selfie_name,
           get_name(context),
           (char*) sign_extend(get_exit_code(context), SYSCALL_BITWIDTH));
-}
-
-void emit_lock()
-{
-  create_symbol_table_entry(LIBRARY_TABLE, "lock", 0, PROCEDURE, UINT64_T, 0, binary_length);
-
-  emit_addi(REG_A7, REG_ZR, SYSCALL_LOCK);
-
-  emit_ecall();
-
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-
-void implement_lock(uint64_t *context)
-{
-  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-
-}
-
-void emit_unlock()
-{
-  create_symbol_table_entry(LIBRARY_TABLE, "unlock", 0, PROCEDURE, UINT64_T, 0, binary_length);
-
-  emit_addi(REG_A7, REG_ZR, SYSCALL_UNLOCK);
-
-  emit_ecall();
-
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-
-void implement_unlock(uint64_t *context)
-{
-  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-}
-
-void emit_fork() {
-  create_symbol_table_entry(LIBRARY_TABLE, "fork", 0, PROCEDURE, UINT64_T, 0, binary_length);
-
-  emit_addi(REG_A7, REG_ZR, SYSCALL_FORK);
-
-  emit_ecall();
-
-  // jump back to caller, return value is in REG_A0
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-
-void implement_fork (uint64_t* original_context) {
-  uint64_t* copied_context;
-
-  copied_context = copy_context(original_context);
-}
-
-void emit_wait() {
-  create_symbol_table_entry(LIBRARY_TABLE, "wait", 0, PROCEDURE, VOID_T, 0, binary_length);
-
-  emit_ld(REG_A0, REG_SP, 0);
-  emit_addi(REG_SP, REG_SP, WORDSIZE);
-
-  // load the correct syscall number and invoke syscall
-  emit_addi(REG_A7, REG_ZR, SYSCALL_WAIT);
-
-  emit_ecall();
-
-  // jump back to caller
-  emit_jalr(REG_ZR, REG_RA, 0);
-}
-
-uint64_t implement_wait(uint64_t* context) {
-  uint64_t address;
-  uint64_t has_child;
-  uint64_t* tmp_context;
-  uint64_t* child_context;
-
-  has_child = 0;
-  child_context = used_contexts;
-  address = *(get_regs(context) + REG_A0);
-  set_pc(context, get_pc(context) + INSTRUCTIONSIZE);
-
-  if (is_valid_data_stack_heap_address(context, address) == 0) {
-    if (address != 0) {
-      *(get_regs(context) + REG_A0) = -1;
-      return -1;
-    }
-  }
-
-  while (child_context != (uint64_t*) 0) {
-    tmp_context = child_context;
-    child_context = get_next_context(tmp_context);
-    if (get_parent_process(tmp_context) == context) {
-      has_child = 1;
-      map_and_store(context, *(get_regs(context) + REG_A0), left_shift(sign_shrink(get_exit_code(tmp_context), 8), 8));
-      if (get_process_state(tmp_context) == STATUS_ZOMBIE) {
-        *(get_regs(context) + REG_A0) = get_process_id(tmp_context);
-        used_contexts = delete_context(tmp_context, used_contexts);
-        return get_process_id(tmp_context);
-      }
-    }
-  }
-
-  if (has_child) {
-    *(get_regs(context) + REG_A0) = 0;
-    set_process_state(context, STATUS_BLOCK);
-  } else {
-    *(get_regs(context) + REG_A0) = -1;
-    return -1;
-  }
-
-  return 0;
 }
 
 void emit_read() {
@@ -9977,8 +9146,6 @@ uint64_t* new_context() {
 
   used_contexts = context;
 
-  set_process_state(context, STATUS_READY);
-
   return context;
 }
 
@@ -10070,88 +9237,6 @@ uint64_t* delete_context(uint64_t* context, uint64_t* from) {
   free_context(context);
 
   return from;
-}
-
-uint64_t* copy_context(uint64_t* original) {
-  uint64_t* context;
-  uint64_t count;
-  uint64_t i;
-  uint64_t r;
-
-  context = new_context();
-
-  set_regs(context, smalloc(NUMBEROFREGISTERS * WORDSIZE));
-
-  i = 0;
-  r = 0;
-
-  while (r < NUMBEROFREGISTERS) {
-    *(get_regs(context) + r) = *(get_regs(original) + r);
-
-    r = r + 1;
-  }
-
-  set_lowest_lo_page(context, get_page_of_virtual_address(get_code_seg_start(original)));
-  set_highest_lo_page(context, get_page_of_virtual_address(get_program_break(original) - WORDSIZE) + 1);
-  set_lowest_hi_page(context, get_page_of_virtual_address(*(get_regs(context) + REG_SP)));
-  set_highest_hi_page(context, NUMBEROFPAGES);
-  set_code_seg_start(context, get_code_seg_start(original));
-  set_data_seg_start(context, get_data_seg_start(original));
-  set_heap_seg_start(context, get_heap_seg_start(original));
-  set_program_break(context, get_program_break(original));
-  set_exception(context, get_exception(original));
-  set_fault(context, get_fault(original));
-  set_exit_code(context, get_exit_code(original));
-  set_parent_process(context, original);
-  set_virtual_context(context, get_virtual_context(original));
-  set_name(context, get_name(original));
-  set_parent(context, get_parent(original));
-  new_pid();
-  set_process_id(context, pid);
-
-  set_pt(context, zalloc((VIRTUALMEMORYSIZE / PAGESIZE) * WORDSIZE));
-
-  set_pc(original, get_pc(original) + INSTRUCTIONSIZE);
-  set_pc(context, get_pc(original));
-
-  *(get_regs(original) + REG_A0) = pid;
-  *(get_regs(context) + REG_A0) = 0;
-
-  count = get_lowest_lo_page(context);
-
-  while(count <= get_highest_lo_page(context)) {
-    i = 0;
-
-    while(i < PAGESIZE) {
-      if (is_virtual_address_mapped(get_pt(original), count * PAGESIZE + i))
-        map_and_store(context, count * PAGESIZE + i, load_virtual_memory(get_pt(original), count * PAGESIZE + i));
-
-      i = i + WORDSIZE;
-    }
-
-    count = count + 1;
-  }
-
-  count = get_lowest_hi_page(context);
-
-  while(count <= get_highest_hi_page(context)) {
-    i = 0;
-
-    while(i < PAGESIZE) {
-      if (is_virtual_address_mapped(get_pt(original), count * PAGESIZE + i))
-        map_and_store(context, count * PAGESIZE + i, load_virtual_memory(get_pt(original), count * PAGESIZE + i));
-
-      i = i + WORDSIZE;
-    }
-
-    count = count + 1;
-  }
-
-  return context;
-}
-
-void print_my_name() {
-  printf2("%s: This is %s's Selfie\n", selfie_name, "Muhammed Ali");
 }
 
 // -----------------------------------------------------------------
@@ -10642,28 +9727,6 @@ void up_load_arguments(uint64_t* context, uint64_t argc, uint64_t* argv) {
   *(get_regs(context) + REG_S0) = 0;
 }
 
-uint64_t check_exit(uint64_t* context) {
-  uint64_t exit_code;
-
-  if (get_parent_process(context) == MY_CONTEXT) {
-    used_contexts = (uint64_t*) 0;
-    return EXIT;
-  }
-
-  if (get_process_state(get_parent_process(context)) == STATUS_BLOCK) {
-    set_process_state(get_parent_process(context), STATUS_READY);
-  } else {
-    set_process_state(context, STATUS_ZOMBIE);
-  }
-
-  exit_code = sign_shrink(get_exit_code(context), 8);
-  exit_code = left_shift(exit_code, 8);
-  if (is_valid_virtual_address(*(get_regs(get_parent_process(context)) + REG_A0)))
-    map_and_store(get_parent_process(context), *(get_regs(get_parent_process(context)) + REG_A0), exit_code);
-
-  return DONOTEXIT;
-}
-
 uint64_t handle_system_call(uint64_t* context) {
   uint64_t a7;
 
@@ -10682,18 +9745,11 @@ uint64_t handle_system_call(uint64_t* context) {
     implement_write(context);
   else if (a7 == SYSCALL_OPENAT)
     implement_openat(context);
-  else if (a7 == SYSCALL_FORK)
-    implement_fork(context);
-  else if (a7 == SYSCALL_WAIT)
-    implement_wait(context);
-  else if (a7 == SYSCALL_LOCK)
-    implement_lock(context);
-  else if (a7 == SYSCALL_UNLOCK)
-    implement_unlock(context);
   else if (a7 == SYSCALL_EXIT) {
     implement_exit(context);
-    return check_exit(context);
 
+    // TODO: exit only if all contexts have exited
+    return EXIT;
   } else {
     printf2("%s: unknown system call %u\n", selfie_name, (char*) a7);
 
@@ -10772,7 +9828,6 @@ uint64_t handle_exception(uint64_t* context) {
 uint64_t mipster(uint64_t* to_context) {
   uint64_t timeout;
   uint64_t* from_context;
-  uint64_t* context;
 
   print("mipster\n");
   printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
@@ -10790,55 +9845,10 @@ uint64_t mipster(uint64_t* to_context) {
     } else if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else {
-      if (get_next_context(from_context) != (uint64_t*) 0)
-        to_context = get_next_context(from_context);
-      else {
-        context = used_contexts;
-        while (context != (uint64_t*) 0) {
-          if (get_process_state(context) == STATUS_READY) {
-            if (get_virtual_context(context) == (uint64_t*) 0) {
-              to_context = context;
-              context = (uint64_t*) 0;
-            }
-          }
-          if (context != (uint64_t*) 0)
-            context = get_next_context(context);
-        }
-      }
+      // TODO: scheduler should go here
+      to_context = from_context;
+
       timeout = TIMESLICE;
-    }
-  }
-}
-
-uint64_t mipster_concurrently(uint64_t* to_context, uint64_t context_count) {
-  uint64_t timeout;
-  uint64_t* from_context;
-
-  print("mipster\n");
-  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
-
-  timeout = CONCURRENT_TIMESLICE;
-
-  while (1) {
-    from_context = mipster_switch(to_context, timeout);
-
-    if (get_parent(from_context) != MY_CONTEXT) {
-      to_context = get_parent(from_context);
-
-      timeout = TIMEROFF;
-    } else if (handle_exception(from_context) == EXIT) {
-      context_count = context_count - 1;
-      to_context = delete_context(from_context, used_contexts);
-      timeout = CONCURRENT_TIMESLICE;
-      if (context_count < 1)
-        return get_exit_code(from_context);
-    } else {
-      if (get_next_context(from_context) != (uint64_t*) 0)
-        to_context = get_next_context(from_context);
-      else
-        to_context = used_contexts;
-
-      timeout = CONCURRENT_TIMESLICE;
     }
   }
 }
@@ -10855,34 +9865,8 @@ uint64_t hypster(uint64_t* to_context) {
     if (handle_exception(from_context) == EXIT)
       return get_exit_code(from_context);
     else
-    if (get_next_context(from_context) != (uint64_t*) 0)
-      to_context = get_next_context(from_context);
-    else
-      to_context = used_contexts;
-  }
-}
-
-uint64_t hypster_concurrently(uint64_t* to_context, uint64_t context_count) {
-  uint64_t* from_context;
-
-  print("hypster\n");
-  printf1("%s: >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n", selfie_name);
-
-  while (1) {
-    from_context = hypster_switch(to_context, CONCURRENT_TIMESLICE + 1);
-
-    if (handle_exception(from_context) == EXIT){
-      context_count = context_count - 1;
-      to_context = delete_context(from_context, used_contexts);
-      if (context_count < 1)
-        return get_exit_code(from_context);
-    }
-    else {
-      if (get_next_context(from_context) != (uint64_t*) 0)
-        to_context = get_next_context(from_context);
-      else
-        to_context = used_contexts;
-    }
+      // TODO: scheduler should go here
+      to_context = from_context;
   }
 }
 
@@ -11074,10 +10058,8 @@ void boot_loader(uint64_t* context) {
   up_load_arguments(context, number_of_remaining_arguments(), remaining_arguments());
 }
 
-uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
+uint64_t selfie_run(uint64_t machine) {
   uint64_t exit_code;
-  uint64_t number_of_contexts;
-  number_of_contexts = context_numbers;
 
   if (binary_length == 0) {
     printf1("%s: nothing to run, debug, or host\n", selfie_name);
@@ -11092,14 +10074,8 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
   init_memory(atoi(peek_argument(0)));
 
   current_context = create_context(MY_CONTEXT, 0);
-  new_pid();
 
   // assert: number_of_remaining_arguments() > 0
-
-  while(number_of_contexts > 1){
-    boot_loader(create_context(MY_CONTEXT, 0));
-    number_of_contexts = number_of_contexts - 1;
-  }
 
   boot_loader(current_context);
 
@@ -11133,12 +10109,9 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
 
   run = 1;
 
-  if (machine == MIPSTER) {
-    if (context_numbers > 1)
-      exit_code = mipster_concurrently(current_context, context_numbers);
-    else
-      exit_code = mipster(current_context);
-  } else if (machine == DIPSTER)
+  if (machine == MIPSTER)
+    exit_code = mipster(current_context);
+  else if (machine == DIPSTER)
     exit_code = mipster(current_context);
   else if (machine == RIPSTER)
     exit_code = mipster(current_context);
@@ -11146,12 +10119,9 @@ uint64_t selfie_run(uint64_t machine, uint64_t context_numbers) {
     exit_code = minster(current_context);
   else if (machine == MOBSTER)
     exit_code = mobster(current_context);
-  else if (machine == HYPSTER) {
-    if (context_numbers > 1)
-      exit_code = hypster_concurrently(current_context, context_numbers);
-    else
-      exit_code = hypster(current_context);
-  } else
+  else if (machine == HYPSTER)
+    exit_code = hypster(current_context);
+  else
     // change 0 to anywhere between 0% to 100% mipster
     exit_code = mixter(current_context, 0);
 
@@ -11220,7 +10190,7 @@ uint64_t no_or_bad_or_more_arguments(uint64_t exit_code) {
 }
 
 void print_synopsis(char* extras) {
-  printf2("synopsis: %s { -c { source } | -a { source } | -o binary | [ -s | -S ] assembly | -l binary }%s\n", selfie_name, extras);
+  printf2("synopsis: %s { -c { source } | -o binary | [ -s | -S ] assembly | -l binary }%s\n", selfie_name, extras);
 }
 
 // -----------------------------------------------------------------
@@ -11242,8 +10212,6 @@ uint64_t selfie(uint64_t extras) {
 
       if (string_compare(argument, "-c"))
         selfie_compile();
-      else if (string_compare(argument, "-a"))
-        selfie_compile_as_assembly();
       else if (number_of_remaining_arguments() == 0)
         // remaining options have at least one argument
         return EXITCODE_BADARGUMENTS;
@@ -11257,21 +10225,17 @@ uint64_t selfie(uint64_t extras) {
         selfie_load();
       else if (extras == 0) {
         if (string_compare(argument, "-m"))
-          return selfie_run(MIPSTER, 1);
+          return selfie_run(MIPSTER);
         else if (string_compare(argument, "-d"))
-          return selfie_run(DIPSTER, 1);
+          return selfie_run(DIPSTER);
         else if (string_compare(argument, "-r"))
-          return selfie_run(RIPSTER, 1);
+          return selfie_run(RIPSTER);
         else if (string_compare(argument, "-y"))
-          return selfie_run(HYPSTER, 1);
+          return selfie_run(HYPSTER);
         else if (string_compare(argument, "-min"))
-          return selfie_run(MINSTER, 1);
+          return selfie_run(MINSTER);
         else if (string_compare(argument, "-mob"))
-          return selfie_run(MOBSTER, 1);
-        else if (string_compare(argument, "-x"))
-          return selfie_run(MIPSTER, atoi(peek_argument(0)));
-        else if (string_compare(argument, "-z"))
-          return selfie_run(HYPSTER, atoi(peek_argument(0)));
+          return selfie_run(MOBSTER);
         else
           return EXITCODE_BADARGUMENTS;
       } else
@@ -11305,9 +10269,6 @@ int main(int argc, char** argv) {
   init_selfie((uint64_t) argc, (uint64_t*) argv);
 
   init_library();
-
-  // assignment-0
-  print_my_name();
 
   init_system();
 
